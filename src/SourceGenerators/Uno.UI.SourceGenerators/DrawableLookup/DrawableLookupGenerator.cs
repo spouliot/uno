@@ -80,11 +80,13 @@ namespace Uno.UI.SourceGenerators.DrawableLookup
 							{
 						
 								writer.AppendLineInvariant($"//a is null?: {_a == null}");
+								writer.AppendLineInvariant($"//a.ns is null?: {_a?.GlobalNamespace == null}");
 								if (_a != null)
 								{
 									GetAllSymbolsVisitor visitor = new GetAllSymbolsVisitor(x => writer.AppendLineInvariant($"//Member: {x}"));
 									visitor.Visit(_a.GlobalNamespace);
-									foreach (var x in _a.GlobalNamespace.GetMembers().OfType<INamedTypeSymbol>().Where(x => x.Name.Contains("Resource")))
+									writer.AppendLineInvariant($"//Member Count: {visitor.Symbols.Count}");
+									foreach (var x in visitor.Symbols)
 									{
 										writer.AppendLineInvariant($"//Member: {x}");
 									}
@@ -119,13 +121,16 @@ namespace Uno.UI.SourceGenerators.DrawableLookup
 		public class GetAllSymbolsVisitor : SymbolVisitor
 		{
 			Action<INamedTypeSymbol> _action;
+			public List<INamedTypeSymbol> Symbols { get; set; } = new List<INamedTypeSymbol>();
 			public GetAllSymbolsVisitor(Action<INamedTypeSymbol> action)
 			{
 				_action = action;
 			}
+
+
 			public override void VisitNamespace(INamespaceSymbol symbol)
 			{
-				foreach (var childSymbol in symbol.GetTypeMembers())
+				foreach (var childSymbol in symbol.GetMembers())
 				{
 					//Once againt we must accept the children to visit 
 					//all of their children
@@ -135,7 +140,7 @@ namespace Uno.UI.SourceGenerators.DrawableLookup
 
 			public override void VisitNamedType(INamedTypeSymbol symbol)
 			{
-				_action(symbol);
+				Symbols.Add(symbol);
 
 				foreach (var childSymbol in symbol.GetTypeMembers())
 				{
