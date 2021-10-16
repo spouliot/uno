@@ -15,6 +15,7 @@ using Uno.Logging;
 using Uno.UI.SourceGenerators.Telemetry;
 using Uno.UI.Xaml;
 using Uno.UI.SourceGenerators.Helpers;
+using System.Threading.Tasks;
 
 #if NETFRAMEWORK
 using Microsoft.Build.Execution;
@@ -29,6 +30,8 @@ namespace Uno.UI.SourceGenerators.DrawableLookup
 	{
 		private List<IFieldSymbol>? _drawableSymbols;
 		private string? _rootNamespace;
+		private IReadOnlyDictionary<string, INamedTypeSymbol[]>? _abc;
+		private IAssemblySymbol? _a;
 
 		public void Initialize(GeneratorInitializationContext context)
 		{
@@ -44,7 +47,9 @@ namespace Uno.UI.SourceGenerators.DrawableLookup
 
 			_rootNamespace = context.GetMSBuildPropertyValue("RootNamespace");
 			var resource = context.Compilation.GetTypeByMetadataName($"{_rootNamespace}.Resource");
-
+		
+			_abc = context.Compilation.GetSymbolNameLookup();
+			_a = context.Compilation.Assembly;
 			_drawableSymbols = resource?.GetTypeMembers()
 				.FirstOrDefault(x => x.Name == "Drawable")
 				?.GetFields()
@@ -73,6 +78,24 @@ namespace Uno.UI.SourceGenerators.DrawableLookup
 						{
 							using (writer.BlockInvariant("return new Dictionary<string, int>"))
 							{
+						
+								writer.AppendLineInvariant($"//a is null?: {_a == null}");
+								if (_a != null)
+								{
+									GetAllSymbolsVisitor visitor = new GetAllSymbolsVisitor(x => writer.AppendLineInvariant($"//Member: {x}"));
+									visitor.Visit(_a.GlobalNamespace);
+									foreach (var x in _a.GlobalNamespace.GetMembers().OfType<INamedTypeSymbol>().Where(x => x.Name.Contains("Resource")))
+									{
+										writer.AppendLineInvariant($"//Member: {x}");
+									}
+								}
+								if (_abc != null && _abc.TryGetValue("Resource", out var types))
+								{
+									foreach (var t in types)
+									{
+										writer.AppendLineInvariant($"//Type: {t}");
+									}
+								}
 								foreach (var drawableSymbol in _drawableSymbols.Safe())
 								{
 									using (writer.BlockInvariant(""))
@@ -91,6 +114,24 @@ namespace Uno.UI.SourceGenerators.DrawableLookup
 			writer.AppendLineInvariant("#endif");
 
 			return writer.ToString();
+		}
+
+		public class GetAllSymbolsVisitor : SymbolVisitor
+		{
+			Action<INamedTypeSymbol> _action;
+			public GetAllSymbolsVisitor(Action<INamedTypeSymbol> action)
+			{
+				_action = action;
+			}
+			public override void VisitNamespace(INamespaceSymbol symbol)
+			{
+				Parallel.ForEach(symbol.GetMembers(), s => s.Accept(this));
+			}
+
+			public override void VisitNamedType(INamedTypeSymbol symbol)
+			{
+				_action(symbol);
+			}
 		}
 	}
 }
