@@ -125,12 +125,24 @@ namespace Uno.UI.SourceGenerators.DrawableLookup
 			}
 			public override void VisitNamespace(INamespaceSymbol symbol)
 			{
-				Parallel.ForEach(symbol.GetMembers(), s => s.Accept(this));
+				foreach (var childSymbol in symbol.GetTypeMembers())
+				{
+					//Once againt we must accept the children to visit 
+					//all of their children
+					childSymbol.Accept(this);
+				}
 			}
 
 			public override void VisitNamedType(INamedTypeSymbol symbol)
 			{
 				_action(symbol);
+
+				foreach (var childSymbol in symbol.GetTypeMembers())
+				{
+					//Once againt we must accept the children to visit 
+					//all of their children
+					childSymbol.Accept(this);
+				}
 			}
 		}
 	}
