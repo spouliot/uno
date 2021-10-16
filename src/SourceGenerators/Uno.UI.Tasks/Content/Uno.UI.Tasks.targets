@@ -6,22 +6,28 @@
   </PropertyGroup>
 
 	<Choose>
-		<When Condition="'$(BuildingInsideUnoSourceGenerator)'=='true'">
+		<When Condition="'$(BuildingInsideUnoSourceGenerator)'=='true' and '$(XamarinProjectType)'=='android'">
 			<PropertyGroup>
 				<AndroidUseManagedDesignTimeResourceGenerator>False</AndroidUseManagedDesignTimeResourceGenerator>
 			</PropertyGroup>
-			
+			<ItemGroup>
+				<Compile Include="$(_AndroidResourceDesignerFile)" />
+				<MyTestProperty0 Condition="!Exists('$(_AndroidResourceDesignerFile)')">42</MyTestProperty0>
+				<MyTestProperty1 Condition="Exists('$(_AndroidResourceDesignerFile)')">43</MyTestProperty1>
+				<MyTestProperty2 Condition="Exists('$(_AndroidResourceDesignerFile)')">43</MyTestProperty2>
+				<MyTestProperty3>$(_AndroidResourceDesignerFile)</MyTestProperty3>
+			</ItemGroup>
 		</When>
 	</Choose>
 
-	<Target Name="_AddAndroidResourceDesignerFile"
+	<!--<Target Name="_AddAndroidResourceDesignerFile"
 		AfterTargets="_UpdateAndroidResgen"
           Condition=" '$(BuildingInsideUnoSourceGenerator)'=='true' and '$(XamarinProjectType)'=='android'">
 		
 		<ItemGroup>
 			<Compile Include="$(_AndroidResourceDesignerFile)" />
 		</ItemGroup>
-	</Target>
+	</Target>-->
 
 
 	<ItemGroup>
