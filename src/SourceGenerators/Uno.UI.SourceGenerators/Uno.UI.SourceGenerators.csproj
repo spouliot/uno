@@ -6,6 +6,7 @@
 		<WarningsAsErrors>true</WarningsAsErrors>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<UnoSourceGeneratorUnsecureBinLogEnabled>true</UnoSourceGeneratorUnsecureBinLogEnabled>
 	</PropertyGroup>
 	
 	<ItemGroup Condition="'$(TargetFramework)'=='net461'">

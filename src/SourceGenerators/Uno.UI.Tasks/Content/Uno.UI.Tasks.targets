@@ -12,22 +12,30 @@
 			</PropertyGroup>
 			<ItemGroup>
 				<Compile Include="$(_AndroidResourceDesignerFile)" />
+				
+			</ItemGroup>
+			<PropertyGroup>
 				<MyTestProperty0 Condition="!Exists('$(_AndroidResourceDesignerFile)')">42</MyTestProperty0>
 				<MyTestProperty1 Condition="Exists('$(_AndroidResourceDesignerFile)')">43</MyTestProperty1>
 				<MyTestProperty2 Condition="Exists('$(_AndroidResourceDesignerFile)')">43</MyTestProperty2>
 				<MyTestProperty3>$(_AndroidResourceDesignerFile)</MyTestProperty3>
-			</ItemGroup>
+				<MyTestProperty8>$(AndroidResgenFile)</MyTestProperty8>
+			</PropertyGroup>
 		</When>
 	</Choose>
 
-	<!--<Target Name="_AddAndroidResourceDesignerFile"
-		AfterTargets="_UpdateAndroidResgen"
+	<Target Name="AddAndroidResourceDesignerFile"
+		AfterTargets="_UpdateAndroidResgenAapt2"
           Condition=" '$(BuildingInsideUnoSourceGenerator)'=='true' and '$(XamarinProjectType)'=='android'">
-		
-		<ItemGroup>
-			<Compile Include="$(_AndroidResourceDesignerFile)" />
-		</ItemGroup>
-	</Target>-->
+
+		<PropertyGroup>
+			<MyTestProperty4 Condition="!Exists('$(_AndroidResourceDesignerFile)')">42</MyTestProperty4>
+			<MyTestProperty5 Condition="Exists('$(_AndroidResourceDesignerFile)')">43</MyTestProperty5>
+			<MyTestProperty6 Condition="Exists('$(_AndroidResourceDesignerFile)')">43</MyTestProperty6>
+			<MyTestProperty7>$(_AndroidResourceDesignerFile)</MyTestProperty7>
+			<MyTestProperty9>$(AndroidResgenFile)</MyTestProperty9>
+		</PropertyGroup>
+	</Target>
 
 
 	<ItemGroup>
