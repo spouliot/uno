@@ -180,6 +180,8 @@ namespace Uno.UI.DualScreen
 					_helper.Initialize(currentActivity);
 				}
 			}
+
+			_helper?.Update();
 		}
 
 		private SurfaceOrientation GetOrientation()
