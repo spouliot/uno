@@ -1,5 +1,5 @@
 ﻿using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI.Controls;
 using System;
 using System.Linq;
@@ -44,7 +44,7 @@ namespace Windows.UI.Xaml.Controls
 
 		partial void Initialize();
 
-		private void UpdateBorder()
+		partial void UpdateBorder()
 		{
 			UpdateBorder(false);
 		}
@@ -56,10 +56,11 @@ namespace Windows.UI.Xaml.Controls
 				_borderRenderer.UpdateLayer(
 					this,
 					Background,
-					BorderThickness,
-					BorderBrush,
-					CornerRadius,
-					Padding,
+					InternalBackgroundSizing,
+					BorderThicknessInternal,
+					BorderBrushInternal,
+					CornerRadiusInternal,
+					PaddingInternal,
 					willUpdateMeasures
 				);
 			}
@@ -74,7 +75,7 @@ namespace Windows.UI.Xaml.Controls
 
 		protected override void OnDraw(Android.Graphics.Canvas canvas)
 		{
-			AdjustCornerRadius(canvas, CornerRadius);
+			AdjustCornerRadius(canvas, CornerRadiusInternal);
 		}
 
 		protected virtual void OnChildrenChanged()
@@ -146,6 +147,6 @@ namespace Windows.UI.Xaml.Controls
 		}
 
 		bool ICustomClippingElement.AllowClippingToLayoutSlot => true;
-		bool ICustomClippingElement.ForceClippingToLayoutSlot => CornerRadius != CornerRadius.None;
+		bool ICustomClippingElement.ForceClippingToLayoutSlot => CornerRadiusInternal != CornerRadius.None;
 	}
 }

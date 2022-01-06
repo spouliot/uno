@@ -1,14 +1,27 @@
-﻿// MUX reference InfoBarPanel.cpp, commit 533c6b1
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+// MUX reference InfoBarPanel.cpp, commit d67e625
 
+using System;
 using Windows.Foundation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
-namespace Microsoft.UI.Xaml.Controls
+namespace Microsoft.UI.Xaml.Controls.Primitives
 {
+	/// <summary>
+	/// Represents a panel that arranges its items horizontally if there is available space, otherwise vertically.
+	/// </summary>
 	public partial class InfoBarPanel : Panel
 	{
 		private bool m_isVertical = false;
+
+		/// <summary>
+		/// Initializes a new instance of the InfoBarPanel class.
+		/// </summary>
+		public InfoBarPanel()
+		{
+		}
 
 		protected override Size MeasureOverride(Size availableSize)
 		{
@@ -129,8 +142,12 @@ namespace Microsoft.UI.Xaml.Controls
 				double horizontalOffset = horizontalOrientationPadding.Left;
 
 				bool hasPreviousElement = false;
-				foreach (UIElement child in Children)
+
+				var children = Children;
+				var childCount = (int)children.Count;
+				for (int i = 0; i < childCount; i++)
 				{
+					var child = children[i];
 					var childAsFe = child as FrameworkElement;
 					if (childAsFe != null)
 					{
@@ -140,7 +157,16 @@ namespace Microsoft.UI.Xaml.Controls
 							var horizontalMargin = GetHorizontalOrientationMargin(child);
 
 							horizontalOffset += hasPreviousElement ? (float)horizontalMargin.Left : 0;
-							child.Arrange(new Rect(horizontalOffset, (float)horizontalOrientationPadding.Top + (float)horizontalMargin.Top, desiredSize.Width, desiredSize.Height));
+
+							if (i < childCount - 1)
+							{
+								child.Arrange(new Rect(horizontalOffset, (float)horizontalOrientationPadding.Top + (float)horizontalMargin.Top, desiredSize.Width, desiredSize.Height));
+							}
+							else
+							{
+								// Give the rest of the horizontal space to the last child.
+								child.Arrange(new Rect(horizontalOffset, (float)horizontalOrientationPadding.Top + (float)horizontalMargin.Top, Math.Max(desiredSize.Width, finalSize.Width - horizontalOffset), desiredSize.Height));
+							}
 							horizontalOffset += desiredSize.Width + (float)horizontalMargin.Right;
 
 							hasPreviousElement = true;

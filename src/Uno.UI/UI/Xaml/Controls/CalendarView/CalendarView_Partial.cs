@@ -7,6 +7,7 @@ using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Globalization;
 using Windows.Globalization.DateTimeFormatting;
+using Windows.System;
 using Windows.UI.Text;
 using Windows.UI.Xaml.Automation;
 using Windows.UI.Xaml.Automation.Peers;
@@ -1848,7 +1849,12 @@ namespace Windows.UI.Xaml.Controls
 
 				if (isScopeChanged)
 				{
+#if __ANDROID__
+					// .InvalidateMeasure() bug https://github.com/unoplatform/uno/issues/6236
+					DispatcherQueue.TryEnqueue(() => UpdateHeaderText(false /*withAnimation*/));
+#else
 					UpdateHeaderText(false /*withAnimation*/);
+#endif
 				}
 
 				// everytime visible indices changed, we need to update
@@ -2004,7 +2010,7 @@ namespace Windows.UI.Xaml.Controls
 							bool isTodayHighlighted = false;
 
 							isTodayHighlighted = IsTodayHighlighted;
-							((CalendarViewBaseItem)spChildAsI).SetIsToday(!isTodayHighlighted);
+							((CalendarViewBaseItem)spChildAsI).SetIsToday(isTodayHighlighted);
 						}
 					}
 				}
@@ -2021,7 +2027,7 @@ namespace Windows.UI.Xaml.Controls
 			// when IsOutOfScopeEnabled property is false, we don't care about scope state (all are inScope),
 			// so we don't need to hook to ScrollViewer's state change handler.
 			// when IsOutOfScopeEnabled property is true, we need to do so.
-			if (m_areDirectManipulationStateChangeHandlersHooked != !isOutOfScopeEnabled)
+			if (m_areDirectManipulationStateChangeHandlersHooked != isOutOfScopeEnabled)
 			{
 				m_areDirectManipulationStateChangeHandlersHooked = !m_areDirectManipulationStateChangeHandlersHooked;
 
@@ -2120,8 +2126,7 @@ namespace Windows.UI.Xaml.Controls
 
 						//A control must be focused before we can set Engagement on it, attempt to set focus first
 						bool focused = false;
-						//focused = FocusManager.SetFocusedElement(spScrollViewer, FocusState.Keyboard, false /*animateIfBringintoView*/);
-						focused = FocusManager.SetFocusedElement(spScrollViewer, FocusNavigationDirection.None, FocusState.Keyboard);
+						focused = FocusManager.SetFocusedElementWithDirection(spScrollViewer, FocusState.Keyboard, false /*animateIfBringintoView*/, false, FocusNavigationDirection.None);
 						if (focused)
 						{
 							FocusManager.SetEngagedControl(spScrollViewer);
@@ -2252,7 +2257,7 @@ namespace Windows.UI.Xaml.Controls
 					ForeachChildInPanel(pPanel, 
 						(CalendarViewBaseItem pItem) =>
 					{
-						pHost.UpdateLabel(pItem, !isLabelVisible);
+						pHost.UpdateLabel(pItem, isLabelVisible);
 					});
 				}
 			}

@@ -4,7 +4,7 @@ using System.Text;
 using Android.Animation;
 using Android.Views.Animations;
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 
 namespace Windows.UI.Xaml.Media.Animation
 {
@@ -236,7 +236,7 @@ namespace Windows.UI.Xaml.Media.Animation
 		public void Cancel() => _adaptee.Cancel();
 
 		/// <inheritdoc />
-		public void SetDuration(long duration) => _adaptee.SetDuration(duration);
+		public void SetDuration(long duration) => _adaptee.SetDuration(Math.Max(0, duration)); // Setting a value below 0 will crash!
 
 		/// <inheritdoc />
 		public void SetEasingFunction(IEasingFunction function)

@@ -1,5 +1,5 @@
 ﻿using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI.DataBinding;
 using Windows.UI.Xaml.Data;
 using System;
@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using Uno.Disposables;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Drawing;
+using Windows.Foundation;
 
 namespace Windows.UI.Xaml.Controls
 {
@@ -17,14 +17,16 @@ namespace Windows.UI.Xaml.Controls
 		public bool CanHorizontallyScroll { get; set; }
 		public bool CanVerticallyScroll { get; set; }
 
+		Size? IScrollContentPresenter.CustomContentExtent => null;
+
 		void IScrollContentPresenter.OnMinZoomFactorChanged(float newValue) { }
 
 		void IScrollContentPresenter.OnMaxZoomFactorChanged(float newValue) { }
 
-		ScrollBarVisibility IScrollContentPresenter.VerticalScrollBarVisibility { get => VerticalScrollBarVisibility; set => VerticalScrollBarVisibility = value; }
+		ScrollBarVisibility IScrollContentPresenter.NativeVerticalScrollBarVisibility { set => VerticalScrollBarVisibility = value; }
 		internal ScrollBarVisibility VerticalScrollBarVisibility { get; set; }
 
-		ScrollBarVisibility IScrollContentPresenter.HorizontalScrollBarVisibility { get => HorizontalScrollBarVisibility; set => HorizontalScrollBarVisibility = value; }
+		ScrollBarVisibility IScrollContentPresenter.NativeHorizontalScrollBarVisibility { set => HorizontalScrollBarVisibility = value; }
 		internal ScrollBarVisibility HorizontalScrollBarVisibility { get; set; }
 	}
 }

@@ -7,9 +7,9 @@ using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
-namespace UITests.Windows_UI_Xaml.FocusManager
+namespace UITests.Windows_UI_Xaml.FocusTests
 {
-	[Sample(ViewModelType = typeof(FocusVisualPropertiesViewModel))]
+	[Sample("Focus", ViewModelType = typeof(FocusVisualPropertiesViewModel))]
 	public sealed partial class Focus_FocusVisual_Properties : Page
     {
 		private readonly Button[] _buttons;
@@ -22,7 +22,7 @@ namespace UITests.Windows_UI_Xaml.FocusManager
 			_buttons = FocusPanel.Children.OfType<Button>().ToArray();
 		}
 
-		public FocusVisualPropertiesViewModel ViewModel { get; private set; }
+		internal FocusVisualPropertiesViewModel ViewModel { get; private set; }
 
 		private void OnDataContextChanged(DependencyObject sender, DataContextChangedEventArgs args)
 		{
@@ -43,7 +43,7 @@ namespace UITests.Windows_UI_Xaml.FocusManager
 		}
 	}
 
-	public class FocusVisualPropertiesViewModel : ViewModelBase
+	internal class FocusVisualPropertiesViewModel : ViewModelBase
 	{
 		private DispatcherTimer _timer = new DispatcherTimer()
 		{

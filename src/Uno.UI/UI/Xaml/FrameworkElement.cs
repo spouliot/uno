@@ -1,4 +1,6 @@
-﻿using Uno.Diagnostics.Eventing;
+﻿#pragma warning disable CS0105 // Ignore duplicate namespaces, to remove when moving to WinUI source tree.
+
+using Uno.Diagnostics.Eventing;
 using Windows.UI.Xaml.Controls;
 using System;
 using System.Collections.Generic;
@@ -10,7 +12,7 @@ using Uno.UI.Controls;
 using System.Threading.Tasks;
 using Windows.UI.Xaml.Media.Animation;
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -21,6 +23,7 @@ using System.ComponentModel;
 using Uno.UI.DataBinding;
 using Uno.UI.Xaml;
 using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Data;
 #if XAMARIN_ANDROID
 using View = Android.Views.View;
 #elif XAMARIN_IOS_UNIFIED
@@ -90,6 +93,12 @@ namespace Windows.UI.Xaml
 		/// </summary>
 		protected virtual bool IsSimpleLayout => false;
 
+		/// <summary>
+		/// Flag for whether this FrameworkElement has a Style set by an ItemsControl. This typically happens when the user provides an explicit container
+		/// in XAML, but does not set a local style for the container.
+		/// </summary>
+		internal bool IsStyleSetFromItemsControl { get; set; }
+
 		#region Tag Dependency Property
 
 #if __IOS__ || __MACOS__ || __ANDROID__
@@ -107,6 +116,23 @@ namespace Windows.UI.Xaml
 
 		#endregion
 
+
+		#region BackgroundSizing Dependency Property (handlers)
+
+		// Actual BackgroundSizing property is define in some elements implementing it:
+		// Border, ContentPresenter, Grid, RelativePanel & StackPanel
+
+		internal BackgroundSizing InternalBackgroundSizing { get; set; }
+
+		private protected virtual void OnBackgroundSizingChangedInner(DependencyPropertyChangedEventArgs e)
+		{
+			InternalBackgroundSizing = (BackgroundSizing)e.NewValue;
+			OnBackgroundSizingChangedPartial(e);
+		}
+
+		partial void OnBackgroundSizingChangedPartial(DependencyPropertyChangedEventArgs dependencyPropertyChangedEventArgs);
+
+		#endregion
 
 
 		partial void Initialize()
@@ -421,6 +447,11 @@ namespace Windows.UI.Xaml
 
 		#region Requested theme dependency property
 
+		// TODO Uno: ActualTheme should always be initialized with Application.Current.RequestedTheme,
+		// and should trigger ActualThemeChanged, when the element enters the visual tree, where some
+		// higher-level element has explicitly changed its RequestedTheme. This may could start working
+		// automatically when the RequestedTheme property supports inheritance.
+
 		public ElementTheme RequestedTheme
 		{
 			get => (ElementTheme)GetValue(RequestedThemeProperty);
@@ -432,7 +463,7 @@ namespace Windows.UI.Xaml
 				nameof(RequestedTheme),
 				typeof(ElementTheme),
 				typeof(FrameworkElement),
-				new PropertyMetadata(
+				new FrameworkPropertyMetadata(
 					ElementTheme.Default,
 					(o, e) => ((FrameworkElement)o).OnRequestedThemeChanged((ElementTheme)e.OldValue, (ElementTheme)e.NewValue)));
 
@@ -442,16 +473,45 @@ namespace Windows.UI.Xaml
 			{
 				// This is an ultra-naive implementation... but nonetheless enables the common use case of overriding the system theme for
 				// the entire visual tree (since Application.RequestedTheme cannot be set after launch)
+				// This will also explicitly change the Application.Current.RequestedTheme, which does not happen in case of UWP.
 				Application.Current.SetExplicitRequestedTheme(Uno.UI.Extensions.ElementThemeExtensions.ToApplicationThemeOrDefault(newValue));
+			}
+
+			if (ActualThemeChanged != null)
+			{
+				var actualThemeChanged =
+					// 1. Previously was default, and new explicit value differs from application theme
+					(oldValue == ElementTheme.Default && Application.Current?.ActualElementTheme != newValue) ||
+					// 2. Previously was explicit, and new ActualTheme is different
+					(oldValue != ElementTheme.Default && oldValue != ActualTheme);
+
+				if (actualThemeChanged)
+				{
+					ActualThemeChanged?.Invoke(this, null);
+				}
 			}
 		}
 
 
 		#endregion
 
-		public ElementTheme ActualTheme => IsWindowRoot ?
-			Application.Current?.ActualElementTheme ?? ElementTheme.Default
-			: ElementTheme.Default;
+		/// <summary>
+		/// Gets or sets a value that determines the light-dark
+		/// preference for the overall theme of an app.
+		/// </summary>
+		/// <remarks>
+		/// This is always either Dark or Light. By default the color matches Application.Current.RequestedTheme.
+		/// When the FrameworkElement.RequestedTheme has non-default value, it has precedence.
+		/// When the value changes ActualThemeChanged event is triggered.
+		/// </remarks>
+		public ElementTheme ActualTheme => RequestedTheme == ElementTheme.Default ?
+			(Application.Current?.ActualElementTheme ?? ElementTheme.Light) :
+			RequestedTheme;
+
+		/// <summary>
+		/// Occurs when the ActualTheme property value has changed.
+		/// </summary>
+		public event TypedEventHandler<FrameworkElement, object> ActualThemeChanged;
 
 		[GeneratedDependencyProperty]
 		public static DependencyProperty FocusVisualSecondaryThicknessProperty { get; } = CreateFocusVisualSecondaryThicknessProperty();
@@ -488,9 +548,6 @@ namespace Windows.UI.Xaml
 
 		private static Thickness GetFocusVisualPrimaryThicknessDefaultValue() => new Thickness(2);
 
-		[GeneratedDependencyProperty(DefaultValue = default(Brush))]
-		public static DependencyProperty FocusVisualPrimaryBrushProperty { get; } = CreateFocusVisualPrimaryBrushProperty();
-
 		public Brush FocusVisualPrimaryBrush
 		{
 			get
@@ -501,8 +558,8 @@ namespace Windows.UI.Xaml
 			set => SetFocusVisualPrimaryBrushValue(value);
 		}
 
-		[GeneratedDependencyProperty]
-		public static DependencyProperty FocusVisualMarginProperty { get; } = CreateFocusVisualMarginProperty();
+		[GeneratedDependencyProperty(DefaultValue = default(Brush))]
+		public static DependencyProperty FocusVisualPrimaryBrushProperty { get; } = CreateFocusVisualPrimaryBrushProperty();
 
 		public Thickness FocusVisualMargin
 		{
@@ -511,6 +568,9 @@ namespace Windows.UI.Xaml
 		}
 
 		private static Thickness GetFocusVisualMarginDefaultValue() => Thickness.Empty;
+
+		[GeneratedDependencyProperty]
+		public static DependencyProperty FocusVisualMarginProperty { get; } = CreateFocusVisualMarginProperty();
 
 		private bool _focusVisualBrushesInitialized = false;
 
@@ -521,11 +581,41 @@ namespace Windows.UI.Xaml
 				return;
 			}
 
-			ResourceResolver.ApplyResource(this, FocusVisualPrimaryBrushProperty, new SpecializedResourceDictionary.ResourceKey("SystemControlFocusVisualPrimaryBrush"), false, null, DependencyPropertyValuePrecedences.DefaultValue);
-			ResourceResolver.ApplyResource(this, FocusVisualSecondaryBrushProperty, new SpecializedResourceDictionary.ResourceKey("SystemControlFocusVisualSecondaryBrush"), false, null, DependencyPropertyValuePrecedences.DefaultValue);
+			ResourceResolver.ApplyResource(this, FocusVisualPrimaryBrushProperty, new SpecializedResourceDictionary.ResourceKey("SystemControlFocusVisualPrimaryBrush"), ResourceUpdateReason.ThemeResource, null, DependencyPropertyValuePrecedences.DefaultValue);
+			ResourceResolver.ApplyResource(this, FocusVisualSecondaryBrushProperty, new SpecializedResourceDictionary.ResourceKey("SystemControlFocusVisualSecondaryBrush"), ResourceUpdateReason.ThemeResource, null, DependencyPropertyValuePrecedences.DefaultValue);
 
 			_focusVisualBrushesInitialized = true;
 		}
+
+		/// <summary>
+		/// Gets or sets whether a disabled control can receive focus.
+		/// </summary>
+		public bool AllowFocusWhenDisabled
+		{
+			get => GetAllowFocusWhenDisabledValue();
+			set => SetAllowFocusWhenDisabledValue(value);
+		}
+
+		/// <summary>
+		/// Identifies the AllowFocusWhenDisabled  dependency property.
+		/// </summary>
+		[GeneratedDependencyProperty(DefaultValue = false, Options = FrameworkPropertyMetadataOptions.Inherits)]
+		public static DependencyProperty AllowFocusWhenDisabledProperty { get; } = CreateAllowFocusWhenDisabledProperty();
+
+		/// <summary>
+		/// Gets or sets a value that indicates whether the element automatically gets focus when the user interacts with it.
+		/// </summary>
+		public bool AllowFocusOnInteraction
+		{
+			get => GetAllowFocusOnInteractionValue();
+			set => SetAllowFocusOnInteractionValue(value);
+		}
+
+		/// <summary>
+		/// Identifies for the AllowFocusOnInteraction dependency property.
+		/// </summary>
+		[GeneratedDependencyProperty(DefaultValue = true, Options = FrameworkPropertyMetadataOptions.Inherits)]
+		public static DependencyProperty AllowFocusOnInteractionProperty { get; } = CreateAllowFocusOnInteractionProperty();
 
 		/// <summary>
 		/// Replace previous style with new style, at nominated precedence. This method is called separately for the user-determined
@@ -777,7 +867,7 @@ namespace Windows.UI.Xaml
 				// Schedule all the phases at once
 				for (int i = startPhaseIndex; i < presenterRoot.DataTemplateRenderPhases.Length; i++)
 				{
-					UIAsyncOperation action = null;
+					Uno.UI.Dispatching.UIAsyncOperation action = null;
 					var phaseCapture = i;
 
 					async void ApplyPhase()
@@ -796,9 +886,9 @@ namespace Windows.UI.Xaml
 
 #if __ANDROID__
 					// Schedule on the animation dispatcher so the callback appears faster.
-					action = presenterRoot.Dispatcher.RunAnimation(ApplyPhase);
+					action = (Uno.UI.Dispatching.UIAsyncOperation)presenterRoot.Dispatcher.RunAnimation(ApplyPhase);
 #elif __IOS__ || __MACOS__
-					action = presenterRoot.Dispatcher.RunAsync(CoreDispatcherPriority.High, ApplyPhase);
+					action = (Uno.UI.Dispatching.UIAsyncOperation)presenterRoot.Dispatcher.RunAsync(CoreDispatcherPriority.High, ApplyPhase);
 #endif
 
 					registerForRecycled(
@@ -820,13 +910,22 @@ namespace Windows.UI.Xaml
 		/// <summary>
 		/// Update ThemeResource references. 
 		/// </summary>
-		internal virtual void UpdateThemeBindings()
+		internal virtual void UpdateThemeBindings(ResourceUpdateReason updateReason)
 		{
-			Resources?.UpdateThemeBindings();
-			(this as IDependencyObjectStoreProvider).Store.UpdateResourceBindings(isThemeChangedUpdate: true);
+			Resources?.UpdateThemeBindings(updateReason);
+			(this as IDependencyObjectStoreProvider).Store.UpdateResourceBindings(updateReason);
 
 			// After theme change, the focus visual brushes may not reflect the correct settings
 			_focusVisualBrushesInitialized = false;
+
+			if (updateReason == ResourceUpdateReason.ThemeResource)
+			{
+				// Trigger ActualThemeChanged if relevant
+				if (ActualThemeChanged != null && RequestedTheme == ElementTheme.Default)
+				{
+					ActualThemeChanged?.Invoke(this, null);
+				}
+			}
 		}
 
 		/// <summary>
@@ -841,7 +940,7 @@ namespace Windows.UI.Xaml
 								: SolidColorBrushHelper.White, DependencyPropertyValuePrecedences.DefaultValue);
 		}
 
-#region AutomationPeer
+		#region AutomationPeer
 #if !__IOS__ && !__ANDROID__ && !__MACOS__ // This code is generated in FrameworkElementMixins
 		private AutomationPeer _automationPeer;
 
@@ -892,7 +991,7 @@ namespace Windows.UI.Xaml
 		}
 #endif
 
-#endregion
+		#endregion
 
 #if !UNO_REFERENCE_API
 		private class FrameworkElementLayouter : Layouter

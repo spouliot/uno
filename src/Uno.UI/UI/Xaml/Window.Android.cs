@@ -5,26 +5,28 @@ using Android.Util;
 using Android.Views;
 using Uno.Disposables;
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI;
+using Uno.UI.Xaml.Core;
 using Windows.ApplicationModel.Core;
 using Windows.Foundation;
 using Windows.Graphics.Display;
 using Windows.UI.Core;
 using Windows.UI.ViewManagement;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Media;
+using Uno.Extensions.ValueType;
+using Uno.UI.Extensions;
 
 namespace Windows.UI.Xaml
 {
 	public sealed partial class Window
 	{
 		private static Window _current;
-		private Grid _main;
+		private RootVisual _rootVisual;
 		private Border _rootBorder;
-		private Border _fullWindow;
 		private UIElement _content;
-		private PopupRoot _popupRoot;
 
 		public Window()
 		{
@@ -43,41 +45,27 @@ namespace Windows.UI.Xaml
 
 		private void InternalSetContent(UIElement value)
 		{
-			if (_main == null)
+			if (_rootVisual == null)
 			{
 				_rootBorder = new Border();
-				_fullWindow = new Border()
-				{
-					VerticalAlignment = VerticalAlignment.Stretch,
-					HorizontalAlignment = HorizontalAlignment.Stretch,
-					Visibility = Visibility.Collapsed
-				};
-				_popupRoot = new PopupRoot();
-				FocusVisualLayer = new Canvas();
+				CoreServices.Instance.PutVisualRoot(_rootBorder);
+				_rootVisual = CoreServices.Instance.MainRootVisual;
 
-				_main = new Grid()
+				if (_rootVisual == null)
 				{
-					IsVisualTreeRoot = true,
-					Children =
-					{
-						_rootBorder,
-						_fullWindow,
-						_popupRoot,
-						FocusVisualLayer
-					}
-				};
+					throw new InvalidOperationException("The root visual could not be created.");
+				}
 
-				ApplicationActivity.Instance?.SetContentView(_main);
+				ApplicationActivity.Instance?.SetContentView(_rootVisual);
 			}
-
 			_rootBorder.Child = _content = value;
 		}
 
 		private UIElement InternalGetContent() => _content;
 
-		private UIElement InternalGetRootElement() => _main;
+		private UIElement InternalGetRootElement() => _rootVisual;
 
-		internal UIElement MainContent => _main;
+		internal UIElement MainContent => _rootVisual;
 
 		private static Window InternalGetCurrentWindow()
 		{
@@ -91,8 +79,63 @@ namespace Windows.UI.Xaml
 
 		internal void RaiseNativeSizeChanged()
 		{
-			var display = (ContextHelper.Current as Activity)?.WindowManager?.DefaultDisplay;
-			var fullScreenMetrics = new DisplayMetrics();
+#if __ANDROID_30__
+			var (windowBounds, visibleBounds, trueVisibleBounds) = Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.R
+				? GetVisualBounds()
+				: GetVisualBoundsLegacy();
+#else
+			var (windowBounds, visibleBounds, trueVisibleBounds) = GetVisualBoundsLegacy();
+#endif
+
+			ApplicationView.GetForCurrentView()?.SetVisibleBounds(visibleBounds);
+			ApplicationView.GetForCurrentView()?.SetTrueVisibleBounds(trueVisibleBounds);
+
+			if (Bounds != windowBounds)
+			{
+				Bounds = windowBounds;
+
+				RaiseSizeChanged(
+					new Windows.UI.Core.WindowSizeChangedEventArgs(
+						new Windows.Foundation.Size(Bounds.Width, Bounds.Height)
+					)
+				);
+			}
+		}
+
+#if __ANDROID_30__
+		private (Rect windowBounds, Rect visibleBounds, Rect trueVisibleBounds) GetVisualBounds()
+		{
+			var metrics = (ContextHelper.Current as Activity)?.WindowManager?.CurrentWindowMetrics;
+
+			var insetsTypes = WindowInsets.Type.SystemBars(); // == WindowInsets.Type.StatusBars() | WindowInsets.Type.NavigationBars() | WindowInsets.Type.CaptionBar();
+			var opaqueInsetsTypes = insetsTypes;
+			if (IsStatusBarTranslucent())
+			{
+				opaqueInsetsTypes &= ~WindowInsets.Type.StatusBars();
+			}
+			if (IsNavigationBarTranslucent())
+			{
+				opaqueInsetsTypes &= ~WindowInsets.Type.NavigationBars();
+			}
+
+			var insets = metrics.WindowInsets.GetInsets(insetsTypes).ToThickness();
+			var opaqueInsets = metrics.WindowInsets.GetInsets(opaqueInsetsTypes).ToThickness();
+			var translucentInsets = insets.Minus(opaqueInsets);
+
+			// The 'metric.Bounds' does not include any insets, so we remove the "opaque" insets under which we cannot draw anything
+			var windowBounds = new Rect(default, ((Rect)metrics.Bounds).DeflateBy(opaqueInsets).Size);
+
+			// The visible bounds is the windows bounds on which we remove also translucentInsets
+			var visibleBounds = windowBounds.DeflateBy(translucentInsets);
+
+			return (windowBounds.PhysicalToLogicalPixels(), visibleBounds.PhysicalToLogicalPixels(), visibleBounds.PhysicalToLogicalPixels());
+		}
+#endif
+
+		private (Rect windowBounds, Rect visibleBounds, Rect trueVisibleBounds) GetVisualBoundsLegacy()
+		{
+			using var display = (ContextHelper.Current as Activity)?.WindowManager?.DefaultDisplay;
+			using var fullScreenMetrics = new DisplayMetrics();
 
 #pragma warning disable 618
 			display?.GetMetrics(outMetrics: fullScreenMetrics);
@@ -102,12 +145,12 @@ namespace Windows.UI.Xaml
 
 			var statusBarSize = GetLogicalStatusBarSize();
 
-			var statusBarSizeExcluded = IsStatusBarTranslucent() ?
+			var statusBarSizeExcluded = IsStatusBarTranslucent()
 				// The real metrics excluded the StatusBar only if it is plain.
 				// We want to subtract it if it is translucent. Otherwise, it will be like we subtract it twice.
-				statusBarSize :
-				0;
-				var navigationBarSizeExcluded = GetLogicalNavigationBarSizeExcluded();
+				? statusBarSize
+				: 0;
+			var navigationBarSizeExcluded = GetLogicalNavigationBarSizeExcluded();
 
 			// Actually, we need to check visibility of nav bar and status bar since the insets don't
 			UpdateInsetsWithVisibilities();
@@ -155,19 +198,8 @@ namespace Windows.UI.Xaml
 
 			var visibleBounds = CalculateVisibleBounds(statusBarSizeExcluded);
 			var trueVisibleBounds = CalculateVisibleBounds(statusBarSize);
-			ApplicationView.GetForCurrentView()?.SetVisibleBounds(visibleBounds);
-			ApplicationView.GetForCurrentView()?.SetTrueVisibleBounds(trueVisibleBounds);
 
-			if (Bounds != newBounds)
-			{
-				Bounds = newBounds;
-
-				RaiseSizeChanged(
-					new Windows.UI.Core.WindowSizeChangedEventArgs(
-						new Windows.Foundation.Size(Bounds.Width, Bounds.Height)
-					)
-				);
-			}
+			return (newBounds, visibleBounds, trueVisibleBounds);
 		}
 
 		internal void UpdateInsetsWithVisibilities()
@@ -248,27 +280,27 @@ namespace Windows.UI.Xaml
 		{
 			if (element == null)
 			{
-				_fullWindow.Child = null;
+				FullWindowMediaRoot.Child = null;
 				_rootBorder.Visibility = Visibility.Visible;
-				_fullWindow.Visibility = Visibility.Collapsed;
+				FullWindowMediaRoot.Visibility = Visibility.Collapsed;
 			}
 			else
 			{
-				_fullWindow.Visibility = Visibility.Visible;
+				FullWindowMediaRoot.Visibility = Visibility.Visible;
 				_rootBorder.Visibility = Visibility.Collapsed;
-				_fullWindow.Child = element;
+				FullWindowMediaRoot.Child = element;
 			}
 		}
 
-#region StatusBar properties
+		#region StatusBar properties
 		private bool IsStatusBarVisible()
 		{
-				var decorView = (ContextHelper.Current as Activity)?.Window?.DecorView;
+			var decorView = (ContextHelper.Current as Activity)?.Window?.DecorView;
 
-				if (decorView == null)
-				{
-					throw new global::System.Exception("Cannot check NavigationBar visibility property. DecorView is not defined yet.");
-				}
+			if (decorView == null)
+			{
+				throw new global::System.Exception("Cannot check NavigationBar visibility property. DecorView is not defined yet.");
+			}
 
 #pragma warning disable 618
 			return ((int)decorView.SystemUiVisibility & (int)SystemUiFlags.Fullscreen) == 0;
@@ -283,11 +315,11 @@ namespace Windows.UI.Xaml
 			}
 
 			return activity.Window.Attributes.Flags.HasFlag(WindowManagerFlags.TranslucentStatus)
-				|| activity.Window.Attributes.Flags.HasFlag(WindowManagerFlags.LayoutNoLimits); ;
+				|| activity.Window.Attributes.Flags.HasFlag(WindowManagerFlags.LayoutNoLimits);
 		}
-#endregion
+		#endregion
 
-#region NavigationBar properties
+		#region NavigationBar properties
 		private bool IsNavigationBarVisible()
 		{
 			var decorView = (ContextHelper.Current as Activity)?.Window?.DecorView;
@@ -314,32 +346,37 @@ namespace Windows.UI.Xaml
 			return flags.HasFlag(WindowManagerFlags.TranslucentNavigation)
 				|| flags.HasFlag(WindowManagerFlags.LayoutNoLimits);
 		}
-#endregion
+		#endregion
 
-		internal IDisposable OpenPopup(Popup popup)
+		internal IDisposable OpenPopup(Controls.Primitives.Popup popup)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"Creating popup");
 			}
 
+			if (PopupRoot == null)
+			{
+				throw new InvalidOperationException("PopupRoot is not initialized yet.");
+			}
+
 			var popupPanel = popup.PopupPanel;
-			_popupRoot.Children.Add(popupPanel);
+			PopupRoot.Children.Add(popupPanel);
 
 			return new CompositeDisposable(
-				Disposable.Create(() => {
+				Disposable.Create(() =>
+				{
 
-					if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+					if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 					{
 						this.Log().Debug($"Closing popup");
 					}
 
-					_popupRoot.Children.Remove(popupPanel);
+					PopupRoot.Children.Remove(popupPanel);
 				}),
 				VisualTreeHelper.RegisterOpenPopup(popup)
 			);
 		}
-
 	}
 }
 #endif

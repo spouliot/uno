@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using System.Globalization;
 using System.Collections.Generic;
 using Uno.Extensions;
-using Microsoft.Extensions.Logging;
-using Uno.Logging;
+
+using Uno.Foundation.Logging;
 using System.Collections.Concurrent;
 
 namespace Windows.UI.Xaml.Media
@@ -43,8 +43,8 @@ namespace Windows.UI.Xaml.Media
 			{
 				Stretch.Fill => "100% 100%",
 				Stretch.None => "auto",
-				Stretch.Uniform => "auto", // patch for now
-				Stretch.UniformToFill => "auto", // patch for now
+				Stretch.Uniform => "contain", // patch for now
+				Stretch.UniformToFill => "cover",
 				_ => "auto"
 			};
 		}
@@ -87,17 +87,17 @@ namespace Windows.UI.Xaml.Media
 
 			void OnStretchChanged(DependencyObject dependencyobject, DependencyPropertyChangedEventArgs args)
 			{
-				SetPreserveAspectRatio();
+				preserveAspectRatio = SetPreserveAspectRatio();
 			}
 
 			void OnAlignmentChanged(DependencyObject dependencyobject, DependencyPropertyChangedEventArgs args)
 			{
-				SetPreserveAspectRatio();
+				preserveAspectRatio = SetPreserveAspectRatio();
 			}
 
 			void OnTargetLayoutUpdated(object sender, object e)
 			{
-				SetPreserveAspectRatio();
+				preserveAspectRatio = SetPreserveAspectRatio();
 			}
 
 			subscriptionDisposable.Disposable = ImageSource?.Subscribe(OnSourceOpened);
@@ -120,8 +120,13 @@ namespace Windows.UI.Xaml.Media
 							("height", "100%"),
 							("preserveAspectRatio", preserveAspectRatio),
 							("href", _imageUri)
-
 						);
+
+						// Clear any previous image, if any
+						foreach(var previousChild in pattern.GetChildren())
+						{
+							pattern.RemoveChild(previousChild);
+						}
 
 						pattern.AddChild(image);
 

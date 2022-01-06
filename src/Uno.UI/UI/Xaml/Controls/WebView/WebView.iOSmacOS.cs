@@ -12,7 +12,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Threading;
 using Windows.UI.Core;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Windows.Foundation;
 
 #if XAMARIN_IOS_UNIFIED
@@ -194,8 +194,8 @@ namespace Windows.UI.Xaml.Controls
 #if __IOS__
 		private void ParseUriAndLauchMailto(Uri mailtoUri)
 		{
-			CoreDispatcher.Main.RunAsync(
-				CoreDispatcherPriority.Normal,
+			Uno.UI.Dispatching.CoreDispatcher.Main.RunAsync(
+				Uno.UI.Dispatching.CoreDispatcherPriority.Normal,
 				async (ct) =>
 				{
 					try
@@ -245,7 +245,7 @@ namespace Windows.UI.Xaml.Controls
 
 					catch (Exception e)
 					{
-						if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+						if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Error))
 						{
 							this.Log().Error("Unable to launch mailto", e);
 						}
@@ -309,9 +309,9 @@ namespace Windows.UI.Xaml.Controls
 		[Obsolete("https://github.com/unoplatform/uno/pull/1591")]
 		public static bool MustUseWebKitWebView() => true;
 
-		partial void OnScrollEnabledChangedPartial(bool isScrollingEnabled)
+		partial void OnScrollEnabledChangedPartial(bool scrollingEnabled)
 		{
-			_nativeWebView.SetScrollingEnabled(isScrollingEnabled);
+			_nativeWebView.SetScrollingEnabled(scrollingEnabled);
 		}
 
 		private bool VerifyNativeWebViewAvailability()

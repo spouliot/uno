@@ -1,7 +1,7 @@
 ﻿using Android.Graphics;
 using Windows.UI.Xaml.Controls;
 using System;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.Extensions;
 using System.Drawing;
 using Uno.UI;
@@ -43,7 +43,17 @@ namespace Windows.UI.Xaml.Shapes
 			}
 
 			//Drawing paths on the canvas does not respect the canvas' ClipBounds
-			canvas.ClipRect(ClippedFrame?.LogicalToPhysicalPixels().ToRectF());
+			if (ClippedFrame is { } clippedFrame)
+			{
+				clippedFrame = clippedFrame.LogicalToPhysicalPixels();
+				if (FrameRoundingAdjustment is { } fra)
+				{
+					clippedFrame.Width += fra.Width;
+					clippedFrame.Height += fra.Height;
+				}
+
+				canvas.ClipRect(clippedFrame.ToRectF());
+			}
 
 			DrawFill(canvas);
 			DrawStroke(canvas);
@@ -69,9 +79,9 @@ namespace Windows.UI.Xaml.Shapes
 			matrix.PostTranslate(ViewHelper.LogicalToPhysicalPixels(renderOriginX), ViewHelper.LogicalToPhysicalPixels(renderOriginY));
 
 			_path.Transform(matrix);
-			size = size?.LogicalToPhysicalPixels();
 
 			_drawArea = GetPathBoundingBox(_path);
+			
 			_drawArea.Width = size?.Width ?? _drawArea.Width;
 			_drawArea.Height = size?.Height ?? _drawArea.Height;
 
@@ -151,7 +161,7 @@ namespace Windows.UI.Xaml.Shapes
 				}
 				else
 				{
-					this.Log().ErrorIfEnabled(() => "StrokeDashArray containing an odd number of values is not supported on Android.");
+					this.Log().Error("StrokeDashArray containing an odd number of values is not supported on Android.");
 				}
 			}
 		}

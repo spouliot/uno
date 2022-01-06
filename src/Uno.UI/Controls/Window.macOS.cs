@@ -16,7 +16,7 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml;
 using Uno.UI.Controls;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Windows.Foundation;
 using Windows.UI.ViewManagement;
 using Windows.UI.Core.Preview;
@@ -25,6 +25,10 @@ using Windows.Devices.Input;
 using Windows.System;
 using Windows.UI.Input;
 using Point = Windows.Foundation.Point;
+
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+#endif
 
 namespace Uno.UI.Controls
 {
@@ -129,11 +133,9 @@ namespace Uno.UI.Controls
 					case NSEventType.ScrollWheel:
 						CoreWindowEvents?.RaisePointerWheelChanged(ToPointerArgs(evt, posInWindow));
 						break;
-
-					default:
-						base.SendEvent(evt);
-						break;
 				}
+
+				base.SendEvent(evt);
 			}
 			catch (Exception e)
 			{
@@ -280,7 +282,7 @@ namespace Uno.UI.Controls
 		}
 
 		/// <summary>
-		/// Taken from <see cref="https://github.com/xamarin/xamarin-macios/blob/bc492585d137d8c3d3a2ffc827db3cdaae3cc869/src/AppKit/NSEvent.cs#L127" />
+		/// Taken from <see href="https://github.com/xamarin/xamarin-macios/blob/bc492585d137d8c3d3a2ffc827db3cdaae3cc869/src/AppKit/NSEvent.cs#L127" />
 		/// </summary>
 		/// <param name="nativeEvent">Native event</param>
 		/// <returns>Value indicating whether the event is recognized as a "mouse" event.</returns>
@@ -307,7 +309,7 @@ namespace Uno.UI.Controls
 		}
 
 		/// <summary>
-		/// Inspiration from <see cref="https://github.com/xamarin/xamarin-macios/blob/bc492585d137d8c3d3a2ffc827db3cdaae3cc869/src/AppKit/NSEvent.cs#L148"/>
+		/// Inspiration from <see href="https://github.com/xamarin/xamarin-macios/blob/bc492585d137d8c3d3a2ffc827db3cdaae3cc869/src/AppKit/NSEvent.cs#L148"/>
 		/// with some modifications.
 		/// </summary>
 		/// <param name="nativeEvent">Native event</param>

@@ -19,12 +19,16 @@ using UIKit;
 using CoreGraphics;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Animation;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Windows.Foundation;
 using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Automation.Provider;
 using Windows.UI.Xaml.Automation;
 using Uno.UI.Xaml;
+
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+#endif
 
 <# 
 	foreach(var mixin in _mixins) { 
@@ -147,7 +151,7 @@ namespace <#= mixin.NamespaceName #>
 			}
 		}
 
-		public event TypedEventHandler<DependencyObject, object> Loading;
+		public event TypedEventHandler<FrameworkElement, object> Loading;
 
 		public event RoutedEventHandler Loaded;
 
@@ -549,7 +553,7 @@ namespace <#= mixin.NamespaceName #>
 		internal virtual void OnLoading()
 		{
 			OnLoadingPartial();
-			Loading?.Invoke(this, null);
+			Loading?.Invoke(<#= mixin.LoadingInvokeArgument #>, null);
 			OnPostLoading();
 		}
 
@@ -629,7 +633,7 @@ namespace <#= mixin.NamespaceName #>
 		}
 
 		public static DependencyProperty OpacityProperty { get ; } =
-			DependencyProperty.Register("Opacity", typeof(double), typeof(<#= mixin.ClassName #>), new PropertyMetadata(1.0, (s, a) => ((<#= mixin.ClassName #>)s).OnOpacityChanged(a)));
+			DependencyProperty.Register("Opacity", typeof(double), typeof(<#= mixin.ClassName #>), new FrameworkPropertyMetadata(1.0, (s, a) => ((<#= mixin.ClassName #>)s).OnOpacityChanged(a)));
 
 		private void OnOpacityChanged(DependencyPropertyChangedEventArgs args)
 		{
@@ -658,7 +662,7 @@ namespace <#= mixin.NamespaceName #>
 				"Visibility",
 				typeof(Visibility), 
 				typeof(<#= mixin.ClassName #>),
-				new PropertyMetadata(
+				new FrameworkPropertyMetadata(
 					Visibility.Visible,
 					(s, e) => (s as <#= mixin.ClassName #>).OnVisibilityChanged((Visibility)e.OldValue, (Visibility)e.NewValue)
 				)
@@ -724,7 +728,7 @@ namespace <#= mixin.NamespaceName #>
 		}
 
 		public static DependencyProperty IsHitTestVisibleProperty { get ; } =
-			DependencyProperty.Register("IsHitTestVisible", typeof(bool), typeof(<#= mixin.ClassName #>), new PropertyMetadata(true, (s, e) => (s as <#= mixin.ClassName #>).OnIsHitTestVisibleChanged(e)));
+			DependencyProperty.Register("IsHitTestVisible", typeof(bool), typeof(<#= mixin.ClassName #>), new FrameworkPropertyMetadata(true, (s, e) => (s as <#= mixin.ClassName #>).OnIsHitTestVisibleChanged(e)));
 
 		private void OnIsHitTestVisibleChanged(DependencyPropertyChangedEventArgs e)
 		{
@@ -741,7 +745,7 @@ namespace <#= mixin.NamespaceName #>
 		}
 
 		public static DependencyProperty TagProperty { get ; } =
-			DependencyProperty.Register("Tag", typeof(object), typeof(<#= mixin.ClassName #>), new PropertyMetadata(null, (s, e) => (s as <#= mixin.ClassName #>).OnTagChanged(e)));
+			DependencyProperty.Register("Tag", typeof(object), typeof(<#= mixin.ClassName #>), new FrameworkPropertyMetadata(null, (s, e) => (s as <#= mixin.ClassName #>).OnTagChanged(e)));
 
 		private void OnTagChanged(DependencyPropertyChangedEventArgs e)
 		{
@@ -759,7 +763,7 @@ namespace <#= mixin.NamespaceName #>
 		}
 
 		public static DependencyProperty TransitionsProperty { get ; } =
-			DependencyProperty.Register("Transitions", typeof(TransitionCollection), typeof(<#= mixin.ClassName #>), new PropertyMetadata(null, OnTransitionsChanged));
+			DependencyProperty.Register("Transitions", typeof(TransitionCollection), typeof(<#= mixin.ClassName #>), new FrameworkPropertyMetadata(null, OnTransitionsChanged));
 			
 		private static void OnTransitionsChanged(object dependencyObject, DependencyPropertyChangedEventArgs args)
 		{
@@ -806,7 +810,7 @@ namespace <#= mixin.NamespaceName #>
 		/// Backing dependency property for <see cref="RenderTransform"/>
 		/// </summary>
 		public static DependencyProperty RenderTransformProperty { get ; } =
-			DependencyProperty.Register("RenderTransform", typeof(Transform), typeof(<#= mixin.ClassName #>), new PropertyMetadata(null, OnRenderTransformChanged));
+			DependencyProperty.Register("RenderTransform", typeof(Transform), typeof(<#= mixin.ClassName #>), new FrameworkPropertyMetadata(null, OnRenderTransformChanged));
 
 		private static void OnRenderTransformChanged(object dependencyObject, DependencyPropertyChangedEventArgs args)
 		{
@@ -843,7 +847,7 @@ namespace <#= mixin.NamespaceName #>
 		/// Backing dependency property for <see cref="RenderTransformOrigin"/>
 		/// </summary>
 		public static DependencyProperty RenderTransformOriginProperty { get ; } =
-			DependencyProperty.Register("RenderTransformOrigin", typeof(Point), typeof(<#= mixin.ClassName #>), new PropertyMetadata(default(Point), OnRenderTransformOriginChanged));
+			DependencyProperty.Register("RenderTransformOrigin", typeof(Point), typeof(<#= mixin.ClassName #>), new FrameworkPropertyMetadata(default(Point), OnRenderTransformOriginChanged));
 
 		private static void OnRenderTransformOriginChanged(object dependencyObject, DependencyPropertyChangedEventArgs args)
 		{
@@ -905,7 +909,7 @@ namespace <#= mixin.NamespaceName #>
 				{
 					_brushColorChanged.Disposable = null;
 					_brushOpacityChanged.Disposable = null;
-					if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Warning))
+					if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Warning))
 					{
 						this.Log().Warn("Brush is not a SolidColorBrush, ignoring");
 					}
@@ -1093,7 +1097,8 @@ namespace <#= mixin.NamespaceName #>
 		bool overridesAttachedToWindow = false,
 		bool isNewBackground = false,
 		bool hasAutomationPeer = false,
-		bool hasLayouter = false
+		bool hasLayouter = false,
+		bool derivesFromFrameworkElement = true
 	)
 	{
 		_mixins.Add(
@@ -1108,7 +1113,8 @@ namespace <#= mixin.NamespaceName #>
 				IsNewBackground = isNewBackground ? "new" : "",
 				IsFrameworkElement = className == "FrameworkElement" ? "true" : "false",
 				HasAutomationPeer = hasAutomationPeer ? "true" : "false",
-				HasLayouter = hasLayouter ? "true" : "false"
+				HasLayouter = hasLayouter ? "true" : "false",
+				LoadingInvokeArgument = derivesFromFrameworkElement ? "this" : "null"
 			}
 		);
 	}
@@ -1126,6 +1132,7 @@ namespace <#= mixin.NamespaceName #>
 		public string IsFrameworkElement;
 		public string HasAutomationPeer;
 		public string HasLayouter;
+		public string LoadingInvokeArgument;
 	}
 
 	private List<MixinParams> _mixins = new List<MixinParams>();

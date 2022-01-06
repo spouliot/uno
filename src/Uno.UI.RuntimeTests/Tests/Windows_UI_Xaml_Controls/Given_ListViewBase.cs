@@ -27,7 +27,9 @@ using FluentAssertions;
 using FluentAssertions.Execution;
 using Uno.Extensions;
 using Uno.UI.RuntimeTests.Helpers;
-using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using Windows.UI.Xaml.Data;
+using Uno.UI.RuntimeTests.Extensions;
 
 namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml_Controls
 {
@@ -49,11 +51,19 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml_Controls
 
 		private DataTemplate FixedSizeItemTemplate => _testsResources["FixedSizeItemTemplate"] as DataTemplate;
 
+		private DataTemplate NV286_Template => _testsResources["NV286_Template"] as DataTemplate;
+
 		private ItemsPanelTemplate NoCacheItemsStackPanel => _testsResources["NoCacheItemsStackPanel"] as ItemsPanelTemplate;
 
 		private DataTemplate SelectableItemTemplateA => _testsResources["SelectableItemTemplateA"] as DataTemplate;
 		private DataTemplate SelectableItemTemplateB => _testsResources["SelectableItemTemplateB"] as DataTemplate;
 		private DataTemplate SelectableItemTemplateC => _testsResources["SelectableItemTemplateC"] as DataTemplate;
+
+		private DataTemplate RedSelectableTemplate => _testsResources["RedSelectableTemplate"] as DataTemplate;
+		private DataTemplate GreenSelectableTemplate => _testsResources["GreenSelectableTemplate"] as DataTemplate;
+		private DataTemplate BeigeSelectableTemplate => _testsResources["BeigeSelectableTemplate"] as DataTemplate;
+
+		private DataTemplate BoundHeightItemTemplate => _testsResources["BoundHeightItemTemplate"] as DataTemplate;
 
 		[TestInitialize]
 		public void Init()
@@ -654,20 +664,24 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml_Controls
 			await WindowHelper.WaitFor(() => (lastItem = list.ContainerFromItem(19) as ListViewItem) != null);
 			var secondLastItem = list.ContainerFromItem(18) as ListViewItem;
 
-			await WindowHelper.WaitFor(() => GetTop(lastItem), 181, comparer: ApproxEquals);
-			await WindowHelper.WaitFor(() => GetTop(secondLastItem), 152, comparer: ApproxEquals);
+			await WindowHelper.WaitFor(() => GetTop(lastItem, container), 181, comparer: ApproxEquals);
+			await WindowHelper.WaitFor(() => GetTop(secondLastItem, container), 152, comparer: ApproxEquals);
 
 			source.Remove(19);
 
 			await WindowHelper.WaitFor(() => list.Items.Count == 19);
 
-			await WindowHelper.WaitForEqual(181, () => GetTop(list.ContainerFromItem(18) as ListViewItem), tolerance: 2);
+			await WindowHelper.WaitForEqual(181, () => GetTop(list.ContainerFromItem(18) as ListViewItem, container), tolerance: 2);
+		}
 
-			double GetTop(FrameworkElement element)
+		private static double GetTop(FrameworkElement element, FrameworkElement container)
+		{
+			if (element == null)
 			{
-				var transform = element.TransformToVisual(container);
-				return transform.TransformPoint(new Point()).Y;
+				return double.NaN;
 			}
+			var transform = element.TransformToVisual(container);
+			return transform.TransformPoint(new Point()).Y;
 		}
 
 		[TestMethod]
@@ -1230,7 +1244,7 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml_Controls
 		[TestMethod]
 		public async Task When_ItemTemplateSelector_Set_And_Fluent()
 		{
-			using(StyleHelper.UseFluentStyles())
+			using (StyleHelper.UseFluentStyles())
 			{
 				await When_ItemTemplateSelector_Set();
 			}
@@ -1260,11 +1274,377 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml_Controls
 			Assert.AreEqual("Rice", dc.MySelection);
 		}
 
+		[TestMethod]
+		public async Task When_ItemsSource_Move()
+		{
+			var list = new ListView
+			{
+				ItemContainerStyle = NoSpaceContainerStyle,
+				ItemTemplate = FixedSizeItemTemplate
+			};
+
+			var source = new ObservableCollection<string>
+			{
+				"Item0",
+				"Item1",
+				"Item2",
+			};
+			list.ItemsSource = source;
+			list.SelectedIndex = 0;
+
+			var outer = new Grid { Children = { list } };
+			WindowHelper.WindowContent = outer;
+
+			await WindowHelper.WaitForLoaded(list);
+			var container1 = await WindowHelper.WaitForNonNull(() => list.ContainerFromItem("Item1") as ListViewItem);
+			Assert.AreEqual(29, GetTop(container1, outer));
+			Assert.AreEqual(0, list.SelectedIndex);
+			Assert.AreEqual("Item0", list.SelectedItem);
+
+			source.Move(1, 2);
+			await WindowHelper.WaitForEqual(58, () =>
+			{
+				var container = list.ContainerFromItem("Item1") as ListViewItem;
+				return GetTop(container, outer);
+			});
+
+			Assert.AreEqual(0, list.SelectedIndex);
+			Assert.AreEqual("Item0", list.SelectedItem);
+
+			source.Move(2, 0);
+			await WindowHelper.WaitForEqual(0, () =>
+			{
+				var container = list.ContainerFromItem("Item1") as ListViewItem;
+				return GetTop(container, outer);
+			});
+
+			Assert.AreEqual(-1, list.SelectedIndex);
+			Assert.AreEqual(null, list.SelectedItem);
+		}
+
+		[TestMethod]
+		public async Task When_Selection_Events()
+		{
+			var list = new ListView
+			{
+				ItemContainerStyle = NoSpaceContainerStyle,
+				ItemTemplate = FixedSizeItemTemplate
+			};
+
+			var items = Enumerable.Range(0, 4).Select(x => "Item_" + x).ToArray();
+			list.ItemsSource = items;
+			list.SelectedIndex = 0;
+
+			var model = new When_Selection_Events_DataContext();
+			list.DataContext = model;
+			list.SetBinding(Selector.SelectedIndexProperty, new Binding { Path = new PropertyPath(nameof(model.SelectedIndex)), Mode = BindingMode.TwoWay });
+			list.SetBinding(Selector.SelectedItemProperty, new Binding { Path = new PropertyPath(nameof(model.SelectedItem)), Mode = BindingMode.TwoWay });
+			list.SetBinding(Selector.SelectedValueProperty, new Binding { Path = new PropertyPath(nameof(model.SelectedValue)), Mode = BindingMode.TwoWay });
+
+			WindowHelper.WindowContent = list;
+			await WindowHelper.WaitForLoaded(list);
+			await WindowHelper.WaitFor(() => GetPanelChildren(list).Length == 4);
+
+			list.SelectionChanged += (s, e) =>
+			{
+				Assert.AreEqual(list.SelectedItem, "Item_1");
+				Assert.AreEqual(list.SelectedValue, "Item_1");
+				Assert.AreEqual(model.SelectedIndex, 1);
+				Assert.AreEqual(model.SelectedItem, "Item_1");
+				Assert.AreEqual(model.SelectedValue, "Item_1");
+			};
+
+			// update selection
+			list.SelectedIndex = 1;
+		}
+
+		[TestMethod]
+		public async Task When_DisplayMemberPath_Property_Changed()
+		{
+			var itemsSource = (new[] { "aaa", "bbb", "ccc", "ddd" }).Select(s => new When_DisplayMemberPath_Property_Changed_DataContext { Display = s }).ToArray();
+
+			var SUT = new ListView()
+			{
+				ItemContainerStyle = BasicContainerStyle,
+				DisplayMemberPath = "Display",
+				ItemsSource = itemsSource
+			};
+
+			WindowHelper.WindowContent = SUT;
+			await WindowHelper.WaitForLoaded(SUT);
+
+			var secondContainer = await WindowHelper.WaitForNonNull(() => SUT.ContainerFromIndex(1) as ListViewItem);
+			await WindowHelper.WaitForLoaded(secondContainer);
+
+			var tb = secondContainer.FindFirstChild<TextBlock>();
+			Assert.AreEqual("bbb", tb.Text);
+
+			foreach (var item in itemsSource)
+			{
+				item.Display = item.Display.ToUpperInvariant();
+			}
+
+			await WindowHelper.WaitForResultEqual("BBB", () => tb.Text);
+		}
+
+		[TestMethod]
+		public async Task When_Item_Removed_And_Relayout_NV286()
+		{
+			using (FeatureConfigurationHelper.UseListViewAnimations())
+			{
+				var source = new ObservableCollection<string>();
+				var index = 0;
+				for (int i = 0; i < 5; i++)
+				{
+					InsertAnItem();
+				}
+
+				var SUT = new ListView
+				{
+					HorizontalAlignment = HorizontalAlignment.Left,
+					Width = 300,
+					Height = 180,
+					Background = new SolidColorBrush(Colors.Beige),
+					ItemsSource = source,
+					ItemTemplate = NV286_Template
+				};
+
+				var errorCatchGrid = new ErrorCatchGrid
+				{
+					Children =
+					{
+						SUT
+					}
+				};
+
+				WindowHelper.WindowContent = errorCatchGrid;
+				await WindowHelper.WaitForLoaded(SUT);
+				await WindowHelper.WaitForNonNull(() => SUT.ContainerFromIndex(3));
+
+				source.RemoveAt(source.Count - 1);
+				InsertAnItem();
+				InsertAnItem();
+
+				await Task.Delay(5); // The key to reproing the bug is to trigger a relayout asynchronously, while the disappear animation is still in flight
+				var viewToModify = SUT.ContainerFromIndex(3) as ListViewItem;
+				Assert.IsNotNull(viewToModify);
+				var border = viewToModify.FindFirstChild<Border>(b => b.Name == "ItemBorder");
+				Assert.IsNotNull(border);
+				border.Width += 20;
+
+				await WindowHelper.WaitForIdle();
+
+				if (errorCatchGrid.Exception is { } e)
+				{
+					throw e;
+				}
+
+				// If all goes well, the app will not crash when the removed item finishes animating
+
+				void InsertAnItem()
+				{
+					index++;
+					source.Insert(0, $"Item {index}");
+				}
+			}
+		}
+
+		[TestMethod]
+#if __WASM__
+		[Ignore("Fails on WASM - https://github.com/unoplatform/uno/issues/7323")] 
+#endif
+		public async Task When_ItemTemplate_Selector_Correct_Reuse()
+		{
+			var selector = new KeyedTemplateSelector<ItemColor>(o => (o as ItemColorViewModel)?.ItemType ?? ItemColor.None)
+			{
+				Templates =
+				{
+					{ItemColor.Red, RedSelectableTemplate },
+					{ItemColor.Green, GreenSelectableTemplate},
+					{ItemColor.Beige, BeigeSelectableTemplate}
+				}
+			};
+
+			var source = new List<ItemColorViewModel>();
+			int itemNo = 0;
+			void AddItem(ItemColor itemType)
+			{
+				itemNo++;
+				source.Add(new ItemColorViewModel { ItemType = itemType, ItemIndex = itemNo });
+			}
+
+			AddItem(ItemColor.Red);
+			AddItem(ItemColor.Green);
+
+			for (int i = 0; i < 10; i++)
+			{
+				AddItem(ItemColor.Beige);
+			}
+
+			AddItem(ItemColor.Green);
+
+			var SUT = new ListView
+			{
+				Width = 180,
+				Height = 320,
+				ItemsSource = source,
+				ItemTemplateSelector = selector,
+				ItemsPanel = NoCacheItemsStackPanel,
+				ItemContainerStyle = NoSpaceContainerStyle
+			};
+
+			WindowHelper.WindowContent = SUT;
+			await WindowHelper.WaitForLoaded(SUT);
+
+			var redLeader = SUT.ContainerFromIndex(0) as ListViewItem;
+			var greenLeader = SUT.ContainerFromIndex(1) as ListViewItem;
+			var redGrid = redLeader.FindFirstChild<CounterGrid>();
+			var greenGrid = greenLeader.FindFirstChild<CounterGrid>();
+
+			var sv = SUT.FindFirstChild<ScrollViewer>();
+
+			sv.ChangeView(null, 100, null, disableAnimation: true);
+			await Task.Delay(20);
+
+			var redCount1 = redGrid.LocalBindCount;
+			var greenCount1 = greenGrid.LocalBindCount;
+
+			for (int i = 300; i < 1000; i += 300)
+			{
+				sv.ChangeView(null, i, null, disableAnimation: true);
+				await Task.Delay(20);
+			}
+
+
+			var redCount2 = redGrid.LocalBindCount;
+			var greenCount2 = greenGrid.LocalBindCount;
+
+			Assert.AreEqual(redCount1, redCount2); // Red template should not have been rebound
+			Assert.AreEqual(greenCount1 + 1, greenCount2); // Green template should be reused once for final item
+		}
+
+		[TestMethod]
+#if __WASM__
+		[Ignore] // https://github.com/unoplatform/uno/issues/7323
+#endif
+		public async Task When_Unequal_Size_Item_Removed()
+		{
+			var source = new ObservableCollection<ItemHeightViewModel>(
+				Enumerable.Range(0, 20).Select(i => new ItemHeightViewModel { DisplayString = $"Item {i}", ItemHeight = 54 })
+			);
+
+			source[0].ItemHeight = 143;
+
+			var SUT = new ListView
+			{
+				Height = 200,
+				ItemsSource = source,
+				ItemContainerStyle = NoSpaceContainerStyle,
+				ItemsPanel = NoCacheItemsStackPanel,
+				ItemTemplate = BoundHeightItemTemplate
+			};
+
+			WindowHelper.WindowContent = SUT;
+			await WindowHelper.WaitForLoaded(SUT);
+
+			var sv = SUT.FindFirstChild<ScrollViewer>();
+			Assert.IsNotNull(sv);
+			var panel = SUT.FindFirstChild<ItemsStackPanel>();
+			for (int i = 100; i <= 1000; i += 100)
+			{
+				sv.ChangeView(null, i, null, disableAnimation: true);
+#if __SKIA__ || __WASM__
+				// Without invalidating, the ListView.managed items panel size remains at its original estimated size, which was overestimated based on abnormally large first item, which would result in scroll overshooting
+				panel.InvalidateMeasure();
+#endif
+				await Task.Delay(10);
+			}
+
+			await WindowHelper.WaitForNonNull(() => SUT.ContainerFromIndex(source.Count - 1));
+
+			Assert.AreEqual(969, sv.VerticalOffset, delta: 1);
+
+			source.RemoveAt(0);
+
+			for (int i = 1000; i >= -100; i -= 100)
+			{
+				sv.ChangeView(null, i, null, disableAnimation: true);
+#if __SKIA__ || __WASM__
+				panel.InvalidateMeasure();
+#endif
+				await Task.Delay(10);
+			}
+
+			var firstContainer = await WindowHelper.WaitForNonNull(() => SUT.ContainerFromIndex(0) as ListViewItem);
+			var textBlock = firstContainer.FindFirstChild<TextBlock>(t => t.Name == "DisplayStringTextBlock");
+			Assert.AreEqual("Item 1", textBlock.Text);
+
+			Assert.AreEqual(0, sv.VerticalOffset);
+
+			var listBounds = SUT.GetOnScreenBounds();
+			var itemBounds = firstContainer.GetOnScreenBounds();
+			Assert.AreEqual(listBounds.Y, itemBounds.Y); // Top of first item should align with top of list
+		}
+
+		[TestMethod]
+		public async Task When_Unmaterialized_Item_Size_Changed()
+		{
+			var source = new ObservableCollection<ItemHeightViewModel>(
+				Enumerable.Range(0, 20).Select(i => new ItemHeightViewModel { DisplayString = $"Item {i}", ItemHeight = 54 })
+			);
+
+			var SUT = new ListView
+			{
+				Height = 200,
+				ItemsSource = source,
+				ItemContainerStyle = NoSpaceContainerStyle,
+				ItemsPanel = NoCacheItemsStackPanel,
+				ItemTemplate = BoundHeightItemTemplate
+			};
+
+			WindowHelper.WindowContent = SUT;
+			await WindowHelper.WaitForLoaded(SUT);
+
+			var sv = SUT.FindFirstChild<ScrollViewer>();
+			Assert.IsNotNull(sv);
+			var panel = SUT.FindFirstChild<ItemsStackPanel>();
+			for (int i = 100; i <= 1000; i += 100)
+			{
+				sv.ChangeView(null, i, null, disableAnimation: true);
+				await Task.Delay(10);
+			}
+
+			await WindowHelper.WaitForNonNull(() => SUT.ContainerFromIndex(source.Count - 1));
+
+			Assert.AreEqual(880, sv.VerticalOffset, delta: 1);
+
+			source[0].ItemHeight = 143;
+
+			for (int i = 1000; i >= -100; i -= 100)
+			{
+				sv.ChangeView(null, i, null, disableAnimation: true);
+#if __SKIA__ || __WASM__
+				panel.InvalidateMeasure();
+#endif
+				await Task.Delay(10);
+			}
+
+			var firstContainer = await WindowHelper.WaitForNonNull(() => SUT.ContainerFromIndex(0) as ListViewItem);
+			var textBlock = firstContainer.FindFirstChild<TextBlock>(t => t.Name == "DisplayStringTextBlock");
+			Assert.AreEqual("Item 0", textBlock.Text);
+
+			Assert.AreEqual(0, sv.VerticalOffset);
+
+			var listBounds = SUT.GetOnScreenBounds();
+			var itemBounds = firstContainer.GetOnScreenBounds();
+			Assert.AreEqual(listBounds.Y, itemBounds.Y); // Top of first item should align with top of list
+		}
+
 		private bool ApproxEquals(double value1, double value2) => Math.Abs(value1 - value2) <= 2;
 
-		private class When_Removed_From_Tree_And_Selection_TwoWay_Bound_DataContext : INotifyPropertyChanged
+		private class When_Removed_From_Tree_And_Selection_TwoWay_Bound_DataContext : System.ComponentModel.INotifyPropertyChanged
 		{
-			public event PropertyChangedEventHandler PropertyChanged;
+			public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
 
 			public string[] MyItems { get; } = new[] { "Red beans", "Rice" };
 
@@ -1278,7 +1658,67 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml_Controls
 					_mySelection = value;
 					if (changing)
 					{
-						PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MySelection)));
+						PropertyChanged?.Invoke(this, new global::System.ComponentModel.PropertyChangedEventArgs(nameof(MySelection)));
+					}
+				}
+			}
+		}
+
+		private class When_Selection_Events_DataContext : global::System.ComponentModel.INotifyPropertyChanged
+		{
+			public event global::System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+
+			#region SelectedItem
+			private object _selectedItem;
+			public object SelectedItem
+			{
+				get => _selectedItem;
+				set => RaiseAndSetIfChanged(ref _selectedItem, value);
+			}
+			#endregion
+			#region SelectedValue
+			private object _selectedValue;
+			public object SelectedValue
+			{
+				get => _selectedValue;
+				set => RaiseAndSetIfChanged(ref _selectedValue, value);
+			}
+			#endregion
+			#region SelectedIndex
+			private int _selectedIndex;
+
+			public int SelectedIndex
+			{
+				get => _selectedIndex;
+				set => RaiseAndSetIfChanged(ref _selectedIndex, value);
+			}
+			#endregion
+
+			protected void RaiseAndSetIfChanged<T>(ref T backingField, T value, [CallerMemberName] string propertyName = null)
+			{
+				if (!EqualityComparer<T>.Default.Equals(backingField, value))
+				{
+					backingField = value;
+					PropertyChanged?.Invoke(this, new global::System.ComponentModel.PropertyChangedEventArgs(propertyName));
+				}
+			}
+		}
+
+		private class When_DisplayMemberPath_Property_Changed_DataContext : System.ComponentModel.INotifyPropertyChanged
+		{
+			private string _display;
+
+			public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+
+			public string Display
+			{
+				get => _display;
+				set
+				{
+					if (value != _display)
+					{
+						_display = value;
+						PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Display)));
 					}
 				}
 			}
@@ -1312,5 +1752,89 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml_Controls
 			var template = Templates.UnoGetValueOrDefault(item);
 			return template;
 		}
+	}
+
+	public class KeyedTemplateSelector<T> : DataTemplateSelector
+	{
+		private readonly Func<object, T> _keySelector;
+
+		public KeyedTemplateSelector(Func<object, T> keySelector = null)
+		{
+			this._keySelector = keySelector;
+		}
+
+		public IDictionary<T, DataTemplate> Templates { get; } = new Dictionary<T, DataTemplate>();
+
+		protected override DataTemplate SelectTemplateCore(object item, DependencyObject container) => SelectTemplateCore(item); // On UWP only this overload is called when eg Button.ContentTemplateSelector is set
+
+		protected override DataTemplate SelectTemplateCore(object item)
+		{
+			if (item == null)
+			{
+				return null;
+			}
+
+			T itemT;
+			if (_keySelector != null)
+			{
+				itemT = _keySelector(item);
+			}
+			else if (item is T)
+			{
+				itemT = (T)item;
+			}
+			else
+			{
+				return null;
+			}
+
+			var template = Templates.UnoGetValueOrDefault(itemT);
+			return template;
+		}
+	}
+
+	public enum ItemColor
+	{
+		None,
+		Red,
+		Green,
+		Beige
+	}
+
+	public class ItemColorViewModel
+	{
+		public ItemColor ItemType { get; set; }
+		public int ItemIndex { get; set; }
+		public string DisplayString => $"Item {ItemIndex}";
+	}
+
+	public class ItemHeightViewModel : global::System.ComponentModel.INotifyPropertyChanged
+	{
+		private string _displayString;
+		private double _itemHeight;
+
+		public string DisplayString
+		{
+			get => _displayString;
+			set
+			{
+				if (_displayString != value)
+				{
+					_displayString = value;
+					PropertyChanged?.Invoke(this, new global::System.ComponentModel.PropertyChangedEventArgs(nameof(DisplayString)));
+				}
+			}
+		}
+
+		public double ItemHeight
+		{
+			get => _itemHeight; set
+			{
+				_itemHeight = value;
+				PropertyChanged?.Invoke(this, new global::System.ComponentModel.PropertyChangedEventArgs(nameof(ItemHeight)));
+			}
+		}
+
+		public event global::System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
 	}
 }

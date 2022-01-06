@@ -6,7 +6,6 @@
 
 using System;
 using System.Numerics;
-using Windows.Devices.Input;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.UI.Composition;
@@ -18,6 +17,13 @@ using Uno.Disposables;
 using Uno.UI.Helpers.WinUI;
 using Uno.UI.Extensions;
 using System.Threading.Tasks;
+
+#if HAS_UNO_WINUI
+using Microsoft.UI.Input;
+#else
+using Windows.Devices.Input;
+using Windows.UI.Input;
+#endif
 
 namespace Windows.UI.Xaml.Controls
 {
@@ -96,7 +102,6 @@ namespace Windows.UI.Xaml.Controls
 					//Uno workaround:
 					m_isInteracting = true;
 					_desiredPosition = Vector2.Zero;
-					_lastMoves.Clear(); // Clears inertia.
 					UpdateStackPanelDesiredPosition();
 
 					// This delay is to allow users to see the fully open state before it closes back.
@@ -869,7 +874,7 @@ namespace Windows.UI.Xaml.Controls
 			CloseIfNotRemainOpenExecuteItem();
 		}
 
-		private void DismissSwipeOnAnExternalCoreWindowTap(CoreWindow sender, PointerEventArgs args)
+		private void DismissSwipeOnAnExternalCoreWindowTap(CoreWindow sender, Windows.UI.Core.PointerEventArgs args)
 		{
 			DismissSwipeOnAnExternalTap(args.CurrentPoint.RawPosition);
 		}

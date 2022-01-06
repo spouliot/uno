@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using Gtk;
 using Uno.UI.Xaml.Controls.Extensions;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using GLib;
 using Pango;
@@ -11,8 +12,14 @@ using Uno.Disposables;
 using Uno.UI.Runtime.Skia.GTK.UI.Text;
 using GtkWindow = Gtk.Window;
 using Object = GLib.Object;
-using Point = Windows.Foundation.Point;
 using Scale = Pango.Scale;
+using System.Diagnostics;
+using Windows.UI.Xaml.Media;
+using Gdk;
+using Point = Windows.Foundation.Point;
+using GdkPoint = Gdk.Point;
+using Size = Windows.Foundation.Size;
+using GdkSize = Gdk.Size;
 
 namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 {
@@ -25,9 +32,10 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 		private ContentControl? _contentElement;
 		private Widget? _currentInputWidget;
 		private bool _handlingTextChanged;
+		private GdkPoint _lastPosition = new GdkPoint(-1, -1);
+		private GdkSize _lastSize = new GdkSize(-1, -1);
 
 		private readonly SerialDisposable _textChangedDisposable = new SerialDisposable();
-		private readonly SerialDisposable _textBoxEventSubscriptions = new SerialDisposable();
 
 		public TextBoxViewExtension(TextBoxView owner, GtkWindow window)
 		{
@@ -35,10 +43,12 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 			_window = window ?? throw new ArgumentNullException(nameof(window));
 		}
 
+		public static TextBoxViewExtension? ActiveTextBoxView { get; private set; }
+
 		private Fixed GetWindowTextInputLayer()
 		{
 			// now we have the GtkEventBox
-			var overlay = (Overlay)((EventBox) _window.Child).Child;
+			var overlay = (Overlay)((EventBox)_window.Child).Child;
 			return overlay.Children.OfType<Fixed>().First();
 		}
 
@@ -52,24 +62,15 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 			}
 
 			_contentElement = textBox.ContentElement;
-
-			EnsureWidgetForAcceptsReturn(textBox.AcceptsReturn);
+			EnsureWidget(textBox);
 			var textInputLayer = GetWindowTextInputLayer();
 			textInputLayer.Put(_currentInputWidget!, 0, 0);
-
-			textBox.SizeChanged += ContentElementSizeChanged;
-			textBox.LayoutUpdated += ContentElementLayoutUpdated;
-			_textBoxEventSubscriptions.Disposable = Disposable.Create(() =>
-			{
-				textBox.SizeChanged -= ContentElementSizeChanged;
-				textBox.LayoutUpdated -= ContentElementLayoutUpdated;
-			});
-
+			_lastSize = new GdkSize(-1, -1);
+			_lastPosition = new GdkPoint(-1, -1);
 			UpdateNativeView();
 			SetWidgetText(textBox.Text);
 
-			UpdateSize();
-			UpdatePosition();
+			InvalidateLayout();
 
 			textInputLayer.ShowAll();
 			_currentInputWidget!.HasFocus = true;
@@ -83,7 +84,6 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 			}
 
 			_contentElement = null;
-			_textBoxEventSubscriptions.Disposable = null;
 
 			if (_currentInputWidget != null)
 			{
@@ -107,7 +107,7 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 				return;
 			}
 
-			EnsureWidgetForAcceptsReturn(textBox.AcceptsReturn);
+			EnsureWidget(textBox);
 
 			var fontDescription = new FontDescription
 			{
@@ -129,6 +129,12 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 			}
 		}
 
+		public void InvalidateLayout()
+		{
+			UpdateSize();
+			UpdatePosition();
+		}
+
 		public void UpdateSize()
 		{
 			if (_contentElement == null || _currentInputWidget == null)
@@ -137,9 +143,18 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 			}
 
 			var textInputLayer = GetWindowTextInputLayer();
-			if (textInputLayer.Children.Contains(_currentInputWidget))
+			if (!textInputLayer.Children.Contains(_currentInputWidget))
 			{
-				_currentInputWidget?.SetSizeRequest((int)_contentElement.ActualWidth, (int)_contentElement.ActualHeight);
+				return;
+			}
+
+			var width = (int)_contentElement.ActualWidth;
+			var height = (int)_contentElement.ActualHeight;
+
+			if (_lastSize.Width != width && _lastSize.Height != height)
+			{
+				_lastSize = new GdkSize(width, height);
+				_currentInputWidget?.SetSizeRequest(_lastSize.Width, _lastSize.Height);
 			}
 		}
 
@@ -150,12 +165,21 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 				return;
 			}
 
+			var textInputLayer = GetWindowTextInputLayer();
+			if (!textInputLayer.Children.Contains(_currentInputWidget))
+			{
+				return;
+			}
+
 			var transformToRoot = _contentElement.TransformToVisual(Windows.UI.Xaml.Window.Current.Content);
 			var point = transformToRoot.TransformPoint(new Point(0, 0));
-			var textInputLayer = GetWindowTextInputLayer();
-			if (textInputLayer.Children.Contains(_currentInputWidget))
+			var pointX = point.X;
+			var pointY = point.Y;
+
+			if (_lastPosition.X != pointX && _lastPosition.Y != pointY)
 			{
-				textInputLayer.Move(_currentInputWidget, (int)point.X, (int)point.Y);
+				_lastPosition = new GdkPoint((int)pointX, (int)pointY);
+				textInputLayer.Move(_currentInputWidget, _lastPosition.X, _lastPosition.Y);
 			}
 		}
 
@@ -170,24 +194,38 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 		{
 			entry.IsEditable = !textBox.IsReadOnly;
 			entry.MaxLength = textBox.MaxLength;
-
 		}
 
-		private void EnsureWidgetForAcceptsReturn(bool acceptsReturn)
+		private void EnsureWidget(TextBox textBox)
 		{
+			var isPassword = false;
+			var isPasswordVisible = true;
+			if (textBox is PasswordBox passwordBox)
+			{
+				isPassword = true;
+				isPasswordVisible = passwordBox.PasswordRevealMode == PasswordRevealMode.Visible;
+			}
+
+			// On UWP, A PasswordBox doesn't have AcceptsReturn property.
+			// The property exists on Uno because PasswordBox incorrectly inherits TextBox.
+			// If we have PasswordBox, ignore AcceptsReturnValue and always use Gtk.Entry
+			var acceptsReturn = textBox.AcceptsReturn && !isPassword;
+
 			var isIncompatibleInputType =
 				(acceptsReturn && !(_currentInputWidget is TextView)) ||
 				(!acceptsReturn && !(_currentInputWidget is Entry));
 			if (isIncompatibleInputType)
 			{
 				var inputText = GetInputText();
-				_currentInputWidget = CreateInputWidget(acceptsReturn);
+				_currentInputWidget = CreateInputWidget(acceptsReturn, isPassword, isPasswordVisible);
 				SetWidgetText(inputText ?? string.Empty);
+				SetForeground(textBox.Foreground);
 			}
 		}
 
-		private Widget CreateInputWidget(bool acceptsReturn)
+		private Widget CreateInputWidget(bool acceptsReturn, bool isPassword, bool isPasswordVisible)
 		{
+			Debug.Assert(!acceptsReturn || !isPassword);
 			Widget widget;
 			if (acceptsReturn)
 			{
@@ -199,6 +237,12 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 			else
 			{
 				var entry = new Entry();
+				if (isPassword)
+				{
+					entry.InputPurpose = InputPurpose.Password;
+					entry.Visibility = isPasswordVisible;
+				}
+
 				entry.Changed += WidgetTextChanged;
 				_textChangedDisposable.Disposable = Disposable.Create(() => entry.Changed -= WidgetTextChanged);
 				widget = entry;
@@ -242,24 +286,91 @@ namespace Uno.UI.Runtime.Skia.GTK.Extensions.UI.Xaml.Controls
 			switch (_currentInputWidget)
 			{
 				case Entry entry:
-					entry.Text = text;
+					// Avoid setting same text (as it raises WidgetTextChanged on GTK).
+					if (entry.Text != text)
+					{
+						entry.Text = text;
+					}
 					break;
 				case TextView textView:
-					textView.Buffer.Text = text;
+					// Avoid setting same text (as it raises WidgetTextChanged on GTK).
+					if (textView.Buffer.Text != text)
+					{
+						textView.Buffer.Text = text;
+					}
 					break;
 			};
 		}
 
-		private void ContentElementLayoutUpdated(object? sender, object e)
+		public void SetIsPassword(bool isPassword)
 		{
-			UpdateSize();
-			UpdatePosition();
+			if (_currentInputWidget is Entry entry)
+			{
+				entry.Visibility = !isPassword;
+			}
 		}
 
-		private void ContentElementSizeChanged(object sender, Windows.UI.Xaml.SizeChangedEventArgs args)
+		public void Select(int start, int length)
 		{
-			UpdateSize();
-			UpdatePosition();
+			var textBox = _owner.TextBox;
+			if (textBox == null)
+			{
+				return;
+			}
+
+			EnsureWidget(textBox);
+			if (_currentInputWidget is Entry entry)
+			{
+				textBox.UpdateFocusState(FocusState.Programmatic);
+				entry.SelectRegion(start_pos: start, end_pos: start + length);
+			}
+			// TODO: Handle TextView..
+		}
+
+		public int GetSelectionStart()
+		{
+			if (_currentInputWidget is Entry entry)
+			{
+				entry.GetSelectionBounds(out var start, out _);
+				return start;
+			}
+			else if (_currentInputWidget is TextView textView)
+			{
+				textView.Buffer.GetSelectionBounds(out var start, out _);
+				return start.Offset; // TODO: Confirm this implementation is correct.
+			}
+
+			return 0;
+		}
+
+		public int GetSelectionLength()
+		{
+			if (_currentInputWidget is Entry entry)
+			{
+				entry.GetSelectionBounds(out var start, out var end);
+				return end - start;
+			}
+			else if (_currentInputWidget is TextView textView)
+			{
+				textView.Buffer.GetSelectionBounds(out var start, out var end);
+				return end.Offset - start.Offset;
+			}
+
+			return 0;
+		}
+
+		public void SetForeground(Windows.UI.Xaml.Media.Brush brush)
+		{
+			if (brush is SolidColorBrush scb)
+			{
+				_currentInputWidget?.OverrideColor(StateFlags.Normal, new Gdk.RGBA
+				{
+					Red = scb.ColorWithOpacity.R,
+					Green = scb.ColorWithOpacity.G,
+					Blue = scb.ColorWithOpacity.B,
+					Alpha = scb.ColorWithOpacity.A
+				});
+			}
 		}
 	}
 }

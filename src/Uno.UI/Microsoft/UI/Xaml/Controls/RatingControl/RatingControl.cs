@@ -1,7 +1,6 @@
-// MUX Reference RatingControl.cpp, commit de78834
-
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
+// MUX Reference RatingControl.cpp, commit 3c73749
 
 using System;
 using Uno.UI.Helpers.WinUI;
@@ -16,8 +15,14 @@ using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Automation.Peers;
 using System.Numerics;
-using Windows.Devices.Input;
 using RatingControlAutomationPeer = Microsoft.UI.Xaml.Automation.Peers.RatingControlAutomationPeer;
+
+#if HAS_UNO_WINUI
+using Microsoft.UI.Input;
+#else
+using Windows.Devices.Input;
+using Windows.UI.Input;
+#endif
 
 namespace Microsoft.UI.Xaml.Controls
 {
@@ -43,33 +48,12 @@ namespace Microsoft.UI.Xaml.Controls
 
 		private const int c_noValueSetSentinel = -1;
 
-		private static UISettings _uiSettings = null;
-
-		private DispatcherHelper m_dispatcherHelper;
-
-		// Private members
-		private TextBlock m_captionTextBlock;
-
-		private CompositionPropertySet m_sharedPointerPropertySet;
-
-		private StackPanel m_backgroundStackPanel;
-		private StackPanel m_foregroundStackPanel;
-
-		private bool m_isPointerOver = false;
-		private bool m_isPointerDown = false;
-		private double m_mousePercentage = 0.0;
-
-		private RatingInfoType m_infoType = RatingInfoType.Font;
-		private double m_preEngagementValue = 0.0;
-		private bool m_disengagedWithA = false;
-		private bool m_shouldDiscardValue = true;
-		private long m_fontFamilyChangedToken;
-
 		/// <summary>
 		/// Initializes a new instance of the RatingControl class.
 		/// </summary>
 		public RatingControl()
 		{
+			// Uno specific: Needs to be initialized in constructor, as "this" is not available in readonly field initializer
 			m_dispatcherHelper = new DispatcherHelper(this);
 			//__RP_Marker_ClassById(RuntimeProfiler.ProfId_RatingControl);
 
@@ -360,6 +344,13 @@ namespace Microsoft.UI.Xaml.Controls
 
 		private void ApplyScaleExpressionAnimation(UIElement uiElement, int starIndex)
 		{
+			var scaleTransform = new ScaleTransform()
+			{
+				ScaleX = 0.5,
+				ScaleY = 0.5
+			};
+			uiElement.RenderTransform = scaleTransform;
+			uiElement.RenderTransformOrigin = new Point(0.5, 0.5);
 			//TODO: Uno Specific - Expression animations are not supported yet
 
 			//Visual uiElementVisual = ElementCompositionPreview.GetElementVisual(uiElement);
@@ -591,7 +582,7 @@ namespace Microsoft.UI.Xaml.Controls
 					Value = c_noValueSetSentinel;
 				}
 
-				if (SharedHelpers.IsRS1OrHigher() && IsFocusEngaged && SharedHelpers.IsAnimationsEnabled())
+				if (SharedHelpers.IsRS1OrHigher() && IsFocusEngaged && ShouldEnableAnimation())
 				{
 					double focalPoint = CalculateStarCenter((int)(ratingValue - 1.0));
 					m_sharedPointerPropertySet.InsertScalar("starsScaleFocalPoint", (float)(focalPoint));
@@ -814,7 +805,7 @@ namespace Microsoft.UI.Xaml.Controls
 			{
 				var point = args.GetCurrentPoint(m_backgroundStackPanel);
 				float xPosition = (float)point.Position.X;
-				if (SharedHelpers.IsAnimationsEnabled())
+				if (ShouldEnableAnimation())
 				{
 					m_sharedPointerPropertySet.InsertScalar("starsScaleFocalPoint", xPosition);
 					var deviceType = args.Pointer.PointerDeviceType;
@@ -1084,6 +1075,17 @@ namespace Microsoft.UI.Xaml.Controls
 			}
 		}
 
+		private bool ShouldEnableAnimation()
+		{
+			// In ControlsResourceVersion2, animation is disabled.
+			return
+				// TODO Uno: Move XamlControlsResources to Uno.UI
+#if !HAS_UNO
+				!XamlControlsResources.IsUsingControlsResourcesVersion2() &&
+#endif
+				SharedHelpers.IsAnimationsEnabled();
+		}
+
 		private void OnFocusEngaged(Control sender, FocusEngagedEventArgs args)
 		{
 			if (!IsReadOnly)
@@ -1141,7 +1143,7 @@ namespace Microsoft.UI.Xaml.Controls
 				ElementSoundPlayer.Play(ElementSoundKind.Invoke);
 			}
 
-			if (SharedHelpers.IsAnimationsEnabled())
+			if (ShouldEnableAnimation())
 			{
 				double focalPoint = CalculateStarCenter((int)(currentValue - 1.0));
 				m_sharedPointerPropertySet.InsertScalar("starsScaleFocalPoint", (float)(focalPoint));
@@ -1195,22 +1197,12 @@ namespace Microsoft.UI.Xaml.Controls
 		}
 
 
+		private UISettings _uiSettings;
+
 		private UISettings GetUISettings()
 		{
 			_uiSettings = _uiSettings ?? new UISettings();
 			return _uiSettings;
-		}
-
-		// Header file
-
-		private bool IsItemInfoPresentAndFontInfo()
-		{
-			return m_infoType == RatingInfoType.Font;
-		}
-
-		private bool IsItemInfoPresentAndImageInfo()
-		{
-			return m_infoType == RatingInfoType.Image;
 		}
 	}
 }

@@ -2,9 +2,9 @@
 
 using System;
 using System.Diagnostics;
-using Microsoft.Extensions.Logging;
+
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Windows.Foundation;
 using Windows.UI.Core;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -45,6 +45,12 @@ namespace Windows.UI.Xaml.Controls
 				return _popup;
 			}
 		}
+
+		internal long CurrentHoverId { get; set; }
+
+		internal IDisposable? OwnerEventSubscriptions { get; set; }
+
+		internal IDisposable? OwnerVisibilitySubscription { get; set; }
 
 #pragma warning disable CS0649
 #pragma warning disable CS0169
@@ -691,7 +697,7 @@ namespace Windows.UI.Xaml.Controls
 		}
 
 		private void OnPopupOpened(
-				object pUnused1,
+				object? pUnused1,
 				object pUnused2)
 		{
 			//OnOpened();

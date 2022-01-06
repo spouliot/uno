@@ -68,7 +68,7 @@ namespace Windows.UI.Xaml.Controls
 
 				isLabelVisible = Owner.IsGroupLabelVisible;
 
-				UpdateLabel(spContainer, !isLabelVisible);
+				UpdateLabel(spContainer, isLabelVisible);
 			}
 
 			// today state will be updated in CalendarViewGeneratorHost.PrepareItemContainer
@@ -163,7 +163,7 @@ namespace Windows.UI.Xaml.Controls
 			if (!m_isRegisteredForCallbacks)
 			{
 				BuildTreeService spBuildTree;
-				spBuildTree = DXamlCore.GetCurrent().GetBuildTreeService();
+				spBuildTree = DXamlCore.Current.GetBuildTreeService();
 				spBuildTree.RegisterWork(this);
 			}
 

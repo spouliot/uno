@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
+// FlowLayoutAlgorithm.cpp, commit 7d1c1c7
 
 using System;
 using System.Collections.Specialized;
@@ -10,7 +11,12 @@ using static Microsoft.UI.Xaml.Controls._Tracing;
 
 namespace Microsoft.UI.Xaml.Controls
 {
-	internal partial class FlowLayoutAlgorithm : OrientationBasedMeasures
+	#if HAS_UNO_WINUI
+	public
+#else
+	internal
+#endif
+	partial class FlowLayoutAlgorithm : OrientationBasedMeasures
 	{
 		private enum GenerateDirection
 		{
@@ -58,7 +64,7 @@ namespace Microsoft.UI.Xaml.Controls
 			context.LayoutStateCore = null;
 		}
 
-		public Size Measure(
+		internal Size Measure(
 			Size availableSize,
 			VirtualizingLayoutContext context,
 			bool isWrapping,
@@ -387,6 +393,8 @@ namespace Microsoft.UI.Xaml.Controls
 						{
 							// Does not fit, wrap to the previous row
 							var availableSizeMinor = Minor(availableSize);
+							// If the last available size is finite, start from end and subtract our desired size.
+							// Otherwise, look at the last extent and use that for positioning.
 							SetMinorStart(ref currentBounds, availableSizeMinor.IsFinite() ? availableSizeMinor - Minor(desiredSize) : MinorSize(LastExtent) - Minor(desiredSize));
 							SetMajorStart(ref currentBounds, lineOffset - Major(desiredSize) - (float)(lineSpacing));
 
@@ -496,9 +504,9 @@ namespace Microsoft.UI.Xaml.Controls
 
 				// Ensure that both minor and major directions are taken into consideration so that if the scrolling direction
 				// is the same as the flow direction we still stop at the end of the viewport rectangle.
-				shouldContinue =
-					(direction == GenerateDirection.Forward && elementMajorStart < rectMajorEnd && elementMinorStart < rectMinorEnd) ||
-					(direction == GenerateDirection.Backward && elementMajorEnd > rectMajorStart && elementMinorEnd > rectMinorStart);
+				shouldContinue = direction == GenerateDirection.Forward
+					? elementMajorStart < rectMajorEnd && elementMinorStart < rectMinorEnd
+					: elementMajorEnd > rectMajorStart && elementMinorEnd > rectMinorStart;
 			}
 
 			return shouldContinue;

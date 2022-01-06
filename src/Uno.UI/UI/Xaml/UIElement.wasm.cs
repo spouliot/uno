@@ -9,14 +9,14 @@ using Windows.UI.Xaml.Media;
 using Uno.Collections;
 using Uno.Extensions;
 using Uno.Foundation;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI;
 using Uno.UI.Extensions;
 using Uno.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.System;
 using System.Reflection;
-using Microsoft.Extensions.Logging;
+
 using Uno.Core.Comparison;
 using Uno.Foundation.Runtime.WebAssembly.Interop;
 
@@ -52,9 +52,9 @@ namespace Windows.UI.Xaml
 			}
 		}
 
-		public Size MeasureView(Size availableSize)
+		public Size MeasureView(Size availableSize, bool measureContent = true)
 		{
-			return Uno.UI.Xaml.WindowManagerInterop.MeasureView(HtmlId, availableSize);
+			return Uno.UI.Xaml.WindowManagerInterop.MeasureView(HtmlId, availableSize, measureContent);
 		}
 
 		internal Rect GetBBox()
@@ -149,7 +149,7 @@ namespace Windows.UI.Xaml
 
 		~UIElement()
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"Collecting UIElement for [{HtmlId}]");
 			}
@@ -410,7 +410,7 @@ namespace Windows.UI.Xaml
 
 		public Func<Size, Size> DesiredSizeSelector { get; set; }
 
-		protected virtual void OnVisibilityChanged(Visibility oldValue, Visibility newVisibility)
+		partial void OnVisibilityChangedPartial(Visibility oldValue, Visibility newVisibility)
 		{
 			InvalidateMeasure();
 			UpdateHitTest();
@@ -574,6 +574,14 @@ namespace Windows.UI.Xaml
 			}
 
 			return false;
+		}
+
+		public UIElement ReplaceChild(int index, UIElement child)
+		{
+			var previous = _children[index];
+			RemoveChild(previous);
+			AddChild(child, index);
+			return previous;
 		}
 
 		internal void MoveChildTo(int oldIndex, int newIndex)

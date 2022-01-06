@@ -9,12 +9,12 @@ using System.Threading.Tasks;
 using ObjCRuntime;
 using Uno.Extensions;
 using Uno.UI.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI.Web;
 using System.IO;
 using System.Linq;
 using Uno.UI.Services;
-using Microsoft.Extensions.Logging;
+
 using Windows.ApplicationModel.Resources;
 using Uno.UI;
 #if __IOS__
@@ -98,7 +98,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private bool OnUnsupportedUriSchemeIdentified(Uri targetUri)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"OnUnsupportedUriSchemeIdentified: {targetUri}");
 			}
@@ -118,7 +118,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private void OnNavigationFinished(Uri destinationUrl)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().DebugFormat("OnNavigationFinished: {0}", destinationUrl);
 			}
@@ -193,7 +193,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private void OnDidClose(WKWebView obj)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().DebugFormat("OnDidClose");
 			}
@@ -201,7 +201,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private void OnRunJavaScriptAlertPanel(WKWebView webview, string message, WKFrameInfo frame, Action completionHandler)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().DebugFormat("OnRunJavaScriptAlertPanel: {0}", message);
 			}
@@ -226,7 +226,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private void OnRunJavaScriptConfirmPanel(WKWebView webview, string message, WKFrameInfo frame, Action<bool> completionHandler)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().DebugFormat("OnRunJavaScriptConfirmPanel: {0}", message);
 			}
@@ -263,7 +263,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private void OnRunJavaScriptTextInputPanel(WKWebView webview, string prompt, string defaultText, WKFrameInfo frame, Action<string> completionHandler)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"OnRunJavaScriptTextInputPanel: {prompt}, {defaultText}");
 			}
@@ -316,7 +316,7 @@ namespace Windows.UI.Xaml.Controls
 		/// <returns>True if the user cancelled the navigation, false otherwise.</returns>
 		private bool OnStarted(Uri targetUrl, bool stopLoadingOnCanceled = true)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().DebugFormat("OnStarted: {0}", targetUrl);
 			}
@@ -345,7 +345,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private void OnError(WKWebView webView, WKNavigation navigation, NSError error)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Error))
 			{
 				this.Log().ErrorFormat("Could not navigate to web page: {0}", error.LocalizedDescription);
 			}
@@ -388,7 +388,7 @@ namespace Windows.UI.Xaml.Controls
 
 		void INativeWebView.GoBack()
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"GoBack");
 			}
@@ -398,7 +398,7 @@ namespace Windows.UI.Xaml.Controls
 
 		void INativeWebView.GoForward()
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"GoForward");
 			}
@@ -408,7 +408,7 @@ namespace Windows.UI.Xaml.Controls
 
 		public async Task<string> EvaluateJavascriptAsync(CancellationToken ct, string javascript)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"EvaluateJavascriptAsync: {javascript}");
 			}
@@ -442,7 +442,7 @@ namespace Windows.UI.Xaml.Controls
 
 			var uri = request.Url?.ToUri();
 
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"LoadRequest: {request.Url?.ToUri()}");
 			}
@@ -484,7 +484,7 @@ namespace Windows.UI.Xaml.Controls
 			}
 			else
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Error))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Error))
 				{
 					this.Log().Error($"The uri [{uri}] is invalid.");
 				}
@@ -499,7 +499,7 @@ namespace Windows.UI.Xaml.Controls
 
 		void INativeWebView.LoadHtmlString(string s, NSUrl baseUrl)
 		{
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"LoadHtmlString: {s}");
 			}
@@ -515,7 +515,7 @@ namespace Windows.UI.Xaml.Controls
 			ScrollView.ScrollEnabled = isScrollingEnabled;
 			ScrollView.Bounces = isScrollingEnabled;
 #else
-			if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+			if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 			{
 				this.Log().Debug($"ScrollingEnabled is not currently supported on macOS");
 			}
@@ -589,7 +589,7 @@ namespace Windows.UI.Xaml.Controls
 
 			public override WKWebView CreateWebView(WKWebView webView, WKWebViewConfiguration configuration, WKNavigationAction navigationAction, WKWindowFeatures windowFeatures)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"CreateWebView: TargetRequest[{navigationAction?.TargetFrame?.Request?.Url?.ToUri()}] Request:[{navigationAction.Request?.Url?.ToUri()}]");
 				}
@@ -599,7 +599,7 @@ namespace Windows.UI.Xaml.Controls
 
 			public override void RunJavaScriptAlertPanel(WKWebView webView, string message, WKFrameInfo frame, Action completionHandler)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKUIDelegate.RunJavaScriptAlertPanel: {message}");
 				}
@@ -609,7 +609,7 @@ namespace Windows.UI.Xaml.Controls
 
 			public override void RunJavaScriptTextInputPanel(WKWebView webView, string prompt, string defaultText, WKFrameInfo frame, Action<string> completionHandler)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKUIDelegate.RunJavaScriptTextInputPanel: {prompt} / {defaultText}");
 				}
@@ -619,7 +619,7 @@ namespace Windows.UI.Xaml.Controls
 
 			public override void RunJavaScriptConfirmPanel(WKWebView webView, string message, WKFrameInfo frame, Action<bool> completionHandler)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKUIDelegate.RunJavaScriptConfirmPanel: {message}");
 				}
@@ -629,7 +629,7 @@ namespace Windows.UI.Xaml.Controls
 
 			public override void DidClose(WKWebView webView)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKUIDelegate.DidClose");
 				}
@@ -644,76 +644,88 @@ namespace Windows.UI.Xaml.Controls
 			/// <summary>
 			/// The reference to the parent UnoWKWebView class on which we invoke callbacks.
 			/// </summary>
-			[Weak]
-			private readonly UnoWKWebView _unoWKWebView;
+			private readonly WeakReference<UnoWKWebView> _unoWKWebView;
 
 			public WebViewNavigationDelegate(UnoWKWebView unoWKWebView)
 			{
-				_unoWKWebView = unoWKWebView;
+				_unoWKWebView = new WeakReference<UnoWKWebView>(unoWKWebView);
 			}
 
 			public override void DecidePolicy(WKWebView webView, WKNavigationAction navigationAction, Action<WKNavigationActionPolicy> decisionHandler)
 			{
 				var requestUrl = navigationAction.Request?.Url.ToUri();
 
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (_unoWKWebView.TryGetTarget(out var unoWKWebView))
 				{
-					this.Log().Debug($"WKNavigationDelegate.DecidePolicy: NavigationType: {navigationAction.NavigationType} Request:{requestUrl} TargetRequest: {navigationAction.TargetFrame?.Request}");
-				}
-
-				var scheme = requestUrl.Scheme.ToLower();
-
-				// Note that the "file" scheme is not officially supported by the UWP WebView (https://docs.microsoft.com/en-us/uwp/api/windows.ui.xaml.controls.webview.unsupportedurischemeidentified?view=winrt-19041#remarks).
-				// We have to support it here for anchor navigation (as long as https://github.com/unoplatform/uno/issues/2998 is not resolved).
-				var isUnsupportedScheme = scheme != "http" && scheme != "https" && scheme != "file";
-				if (isUnsupportedScheme)
-				{
-					bool cancelled = _unoWKWebView.OnUnsupportedUriSchemeIdentified(requestUrl);
-
-					decisionHandler(cancelled ? WKNavigationActionPolicy.Cancel : WKNavigationActionPolicy.Allow);
-
-					return;
-				}
-
-				// The WKWebView doesn't raise navigation event for anchor navigation.
-				// When we detect anchor navigation, we must raise the events (NavigationStarting & NavigationFinished) ourselves.
-				var isAnchorNavigation = GetIsAnchorNavigation();
-				if (isAnchorNavigation)
-				{
-					bool cancelled = _unoWKWebView.OnStarted(requestUrl, stopLoadingOnCanceled: false);
-
-					decisionHandler(cancelled ? WKNavigationActionPolicy.Cancel : WKNavigationActionPolicy.Allow);
-
-					if (!cancelled)
+					if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 					{
-						_unoWKWebView.OnNavigationFinished(requestUrl);
+						this.Log().Debug($"WKNavigationDelegate.DecidePolicy: NavigationType: {navigationAction.NavigationType} Request:{requestUrl} TargetRequest: {navigationAction.TargetFrame?.Request}");
 					}
 
-					return;
+					var scheme = requestUrl.Scheme.ToLower();
+
+					// Note that the "file" scheme is not officially supported by the UWP WebView (https://docs.microsoft.com/en-us/uwp/api/windows.ui.xaml.controls.webview.unsupportedurischemeidentified?view=winrt-19041#remarks).
+					// We have to support it here for anchor navigation (as long as https://github.com/unoplatform/uno/issues/2998 is not resolved).
+					var isUnsupportedScheme = scheme != "http" && scheme != "https" && scheme != "file";
+					if (isUnsupportedScheme)
+					{
+						bool cancelled = unoWKWebView.OnUnsupportedUriSchemeIdentified(requestUrl);
+
+						decisionHandler(cancelled ? WKNavigationActionPolicy.Cancel : WKNavigationActionPolicy.Allow);
+
+						return;
+					}
+
+					// The WKWebView doesn't raise navigation event for anchor navigation.
+					// When we detect anchor navigation, we must raise the events (NavigationStarting & NavigationFinished) ourselves.
+					var isAnchorNavigation = GetIsAnchorNavigation();
+					if (isAnchorNavigation)
+					{
+						bool cancelled = unoWKWebView.OnStarted(requestUrl, stopLoadingOnCanceled: false);
+
+						decisionHandler(cancelled ? WKNavigationActionPolicy.Cancel : WKNavigationActionPolicy.Allow);
+
+						if (!cancelled)
+						{
+							unoWKWebView.OnNavigationFinished(requestUrl);
+						}
+
+						return;
+					}
+
+					// For all other cases, we allow the navigation. This will results in other WKNavigationDelegate methods being called.
+					decisionHandler(WKNavigationActionPolicy.Allow);
+
+					bool GetIsAnchorNavigation()
+					{
+						// If we navigate to the exact same page but with a different location (using anchors), the native control will not notify us of
+						// any navigation. We need to create this notification to indicate that the navigation worked.
+
+						// To detect an anchor navigation, both the previous and new urls need to match on the left part of the anchor indicator ("#")
+						// AND the new url needs to have content on the right of the anchor indicator.
+						var currentUrlParts = unoWKWebView._urlLastNavigation?.AbsoluteUrl?.ToString().Split(new string[] { "#" }, StringSplitOptions.None);
+						var newUrlParts = requestUrl?.AbsoluteUri?.ToString().Split(new string[] { "#" }, StringSplitOptions.None);
+
+						return currentUrlParts?.Length > 0
+							&& newUrlParts?.Length > 1
+							&& currentUrlParts[0].Equals(newUrlParts[0]);
+					}
 				}
-
-				// For all other cases, we allow the navigation. This will results in other WKNavigationDelegate methods being called.
-				decisionHandler(WKNavigationActionPolicy.Allow);
-
-				bool GetIsAnchorNavigation()
+				else
 				{
-					// If we navigate to the exact same page but with a different location (using anchors), the native control will not notify us of
-					// any navigation. We need to create this notification to indicate that the navigation worked.
+					if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Warning))
+					{
+						this.Log().LogWarning($"WKNavigationDelegate.DecidePolicy: Cancelling navigation because owning WKWebView is null (NavigationType: {navigationAction.NavigationType} Request:{requestUrl} TargetRequest: {navigationAction.TargetFrame?.Request})");
+					}
 
-					// To detect an anchor navigation, both the previous and new urls need to match on the left part of the anchor indicator ("#")
-					// AND the new url needs to have content on the right of the anchor indicator.
-					var currentUrlParts = _unoWKWebView._urlLastNavigation?.AbsoluteUrl?.ToString().Split(new string[] { "#" }, StringSplitOptions.None);
-					var newUrlParts = requestUrl?.AbsoluteUri?.ToString().Split(new string[] { "#" }, StringSplitOptions.None);
-
-					return currentUrlParts?.Length > 0
-						&& newUrlParts?.Length > 1
-						&& currentUrlParts[0].Equals(newUrlParts[0]);
+					// CancellationToken the navigation, we're in a case where the owning WKWebView is not alive anymore
+					decisionHandler(WKNavigationActionPolicy.Cancel);
 				}
 			}
 
 			public override void DecidePolicy(WKWebView webView, WKNavigationResponse navigationResponse, Action<WKNavigationResponsePolicy> decisionHandler)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKNavigationDelegate.DecidePolicy {navigationResponse.Response?.Url?.ToUri()}");
 				}
@@ -723,17 +735,27 @@ namespace Windows.UI.Xaml.Controls
 
 			public override void DidReceiveServerRedirectForProvisionalNavigation(WKWebView webView, WKNavigation navigation)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKNavigationDelegate.DidReceiveServerRedirectForProvisionalNavigation: Request:{webView.Url?.ToUri()}");
 				}
 
-				_unoWKWebView.OnStarted(webView.Url?.ToUri());
+				if (_unoWKWebView.TryGetTarget(out var unoWKWebView))
+				{
+					unoWKWebView.OnStarted(webView.Url?.ToUri());
+				}
+				else
+				{
+					if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
+					{
+						this.Log().Debug($"WKNavigationDelegate.DidReceiveServerRedirectForProvisionalNavigation: Ignoring because owning WKWebView is null");
+					}
+				}
 			}
 
 			public override void ContentProcessDidTerminate(WKWebView webView)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKNavigationDelegate.ContentProcessDidTerminate: Request:{webView.Url?.ToUri()}");
 				}
@@ -741,7 +763,7 @@ namespace Windows.UI.Xaml.Controls
 
 			public override void DidCommitNavigation(WKWebView webView, WKNavigation navigation)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKNavigationDelegate.DidCommitNavigation: Request:{webView.Url?.ToUri()}");
 				}
@@ -750,31 +772,71 @@ namespace Windows.UI.Xaml.Controls
 			public override void DidFinishNavigation(WKWebView webView, WKNavigation navigation)
 			{
 				var url = webView.Url?.ToUri();
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKNavigationDelegate.DidFinishNavigation: Request:{url}");
 				}
 
-				_unoWKWebView.OnNavigationFinished(url);
+				if (_unoWKWebView.TryGetTarget(out var unoWKWebView))
+				{
+					unoWKWebView.OnNavigationFinished(url);
+				}
+				else
+				{
+					if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
+					{
+						this.Log().Debug($"WKNavigationDelegate.DidFinishNavigation: Ignoring because owning WKWebView is null");
+					}
+				}
 			}
 
 			public override void DidFailNavigation(WKWebView webView, WKNavigation navigation, NSError error)
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"WKNavigationDelegate.DidCommitNavigation: Request:{webView.Url?.ToUri()}");
 				}
 
-				_unoWKWebView.OnError(webView, navigation, error);
+				if (_unoWKWebView.TryGetTarget(out var unoWKWebView))
+				{
+					unoWKWebView.OnError(webView, navigation, error);
+				}
+				else
+				{
+					if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
+					{
+						this.Log().Debug($"WKNavigationDelegate.DidFailNavigation: Ignoring because owning WKWebView is null");
+					}
+				}
 			}
 			public override void DidStartProvisionalNavigation(WKWebView webView, WKNavigation navigation)
 			{
-				_unoWKWebView.OnStarted(webView.Url?.ToUri());
+				if (_unoWKWebView.TryGetTarget(out var unoWKWebView))
+				{
+					unoWKWebView.OnStarted(webView.Url?.ToUri());
+				}
+				else
+				{
+					if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
+					{
+						this.Log().Debug($"WKNavigationDelegate.DidStartProvisionalNavigation: Ignoring because owning WKWebView is null");
+					}
+				}
 			}
 
 			public override void DidFailProvisionalNavigation(WKWebView webView, WKNavigation navigation, NSError error)
 			{
-				_unoWKWebView.OnError(webView, navigation, error);
+				if (_unoWKWebView.TryGetTarget(out var unoWKWebView))
+				{
+					unoWKWebView.OnError(webView, navigation, error);
+				}
+				else
+				{
+					if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
+					{
+						this.Log().Debug($"WKNavigationDelegate.DidFailProvisionalNavigation: Ignoring because owning WKWebView is null");
+					}
+				}
 			}
 		}
 	}

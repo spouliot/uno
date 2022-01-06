@@ -6,6 +6,10 @@ using System.Drawing;
 using System.Linq;
 using Uno.Disposables;
 
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+#endif
+
 #if XAMARIN_IOS_UNIFIED
 using Foundation;
 using UIKit;
@@ -65,18 +69,6 @@ namespace Windows.UI.Xaml.Controls
 				measuredBreadth = NMath.Max(measuredBreadth, GetBreadthEnd(frame));
 			}
 			return measuredBreadth;
-		}
-
-		private void SetExtentStart(ref CGRect frame, nfloat extentStart)
-		{
-			if (ScrollOrientation == Orientation.Vertical)
-			{
-				frame.Y = extentStart;
-			}
-			else
-			{
-				frame.X = extentStart;
-			}
 		}
 
 		private protected override void UpdateLayoutAttributesForItem(UICollectionViewLayoutAttributes updatingItem, bool shouldRecurse)

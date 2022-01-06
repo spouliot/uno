@@ -1,5 +1,5 @@
 ﻿using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI.DataBinding;
 using Windows.UI.Xaml.Data;
 using System;
@@ -30,6 +30,13 @@ namespace Windows.UI.Xaml.Controls
 {
 	public partial class ScrollContentPresenter : ContentPresenter, ILayoutConstraints
 	{
+		public ScrollContentPresenter()
+		{
+			InitializePartial();
+			RegisterAsScrollPort(this);
+		}
+		partial void InitializePartial();
+
 		#region ScrollOwner
 		private ManagedWeakReference _scroller;
 
@@ -48,6 +55,18 @@ namespace Windows.UI.Xaml.Controls
 		}
 		#endregion
 
+		private ScrollViewer Scroller => ScrollOwner as ScrollViewer;
+
+#if __WASM__
+		bool _forceChangeToCurrentView;
+
+		bool IScrollContentPresenter.ForceChangeToCurrentView
+		{
+			get => _forceChangeToCurrentView;
+			set => _forceChangeToCurrentView = value;
+		}
+#endif
+
 		private void InitializeScrollContentPresenter()
 		{
 			this.RegisterParentChangedCallback(this, OnParentChanged);
@@ -62,24 +81,6 @@ namespace Windows.UI.Xaml.Controls
 				Content = null;
 			}
 		}
-
-#if __IOS__ || __ANDROID__
-		private NativeScrollContentPresenter Native => Content as NativeScrollContentPresenter;
-		private object RealContent => Native?.Content;
-		public ScrollBarVisibility HorizontalScrollBarVisibility => Native?.HorizontalScrollBarVisibility ?? default;
-		public ScrollBarVisibility VerticalScrollBarVisibility => Native?.VerticalScrollBarVisibility ?? default;
-		public bool CanHorizontallyScroll
-		{
-			get => HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled;
-			set { }
-		}
-
-		public bool CanVerticallyScroll
-		{
-			get => VerticalScrollBarVisibility != ScrollBarVisibility.Disabled;
-			set { }
-		}
-#endif
 
 		bool ILayoutConstraints.IsWidthConstrained(View requester)
 		{
@@ -157,6 +158,16 @@ namespace Windows.UI.Xaml.Controls
 			{
 				var slotSize = size;
 
+#if __WASM__
+				if (CanVerticallyScroll || _forceChangeToCurrentView)
+				{
+					slotSize.Height = double.PositiveInfinity;
+				}
+				if (CanHorizontallyScroll || _forceChangeToCurrentView)
+				{
+					slotSize.Width = double.PositiveInfinity;
+				}
+#else
 				if (CanVerticallyScroll)
 				{
 					slotSize.Height = double.PositiveInfinity;
@@ -165,6 +176,7 @@ namespace Windows.UI.Xaml.Controls
 				{
 					slotSize.Width = double.PositiveInfinity;
 				}
+#endif
 
 				child.Measure(slotSize);
 

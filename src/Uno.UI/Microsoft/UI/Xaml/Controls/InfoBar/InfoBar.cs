@@ -1,4 +1,8 @@
-﻿// MUX reference InfoBar.cpp, commit 3125489
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+// MUX reference InfoBar.cpp, commit 1f7779d
+
+#pragma warning disable 105 // remove when moving to WinUI tree
 
 using Microsoft.UI.Xaml.Automation.Peers;
 using Uno.UI.Helpers.WinUI;
@@ -9,11 +13,19 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Markup;
 
 namespace Microsoft.UI.Xaml.Controls
-{	
+{
+	/// <summary>
+	/// An InfoBar is an inline notification for essential app-wide messages.
+	/// The InfoBar will take up space in a layout and will not cover up other
+	/// content or float on top of it. It supports rich content (including titles,
+	/// messages, icons, and buttons) and can be configured to be user-dismissable
+	/// or persistent.
+	/// </summary>
 	[ContentProperty(Name = nameof(Content))]
 	public partial class InfoBar : Control
 	{
 		private const string c_closeButtonName = "CloseButton";
+		private const string c_iconTextBlockName = "StandardIcon";
 		private const string c_contentRootName = "ContentRoot";
 
 		private readonly long _foregroundChangedCallbackRegistration;
@@ -21,8 +33,12 @@ namespace Microsoft.UI.Xaml.Controls
 		private bool m_applyTemplateCalled = false;
 		private bool m_notifyOpen = false;
 		private bool m_isVisible = false;
+		private FrameworkElement m_standardIconTextBlock = null;
 		private InfoBarCloseReason m_lastCloseReason = InfoBarCloseReason.Programmatic;
 
+		/// <summary>
+		/// Initializes a new instance of the InfoBar class.
+		/// </summary>
 		public InfoBar()
 		{
 			//__RP_Marker_ClassById(RuntimeProfiler.ProfId_InfoBar);
@@ -60,6 +76,13 @@ namespace Microsoft.UI.Xaml.Controls
 				var closeButtonTooltipText = ResourceAccessor.GetLocalizedStringResource(ResourceAccessor.SR_InfoBarCloseButtonTooltip);
 				tooltip.Content = closeButtonTooltipText;
 				ToolTipService.SetToolTip(closeButton, tooltip);
+			}
+
+			var iconTextblock = GetTemplateChild<FrameworkElement>(c_iconTextBlockName);
+			if (iconTextblock != null)
+			{
+				m_standardIconTextBlock = iconTextblock;
+				AutomationProperties.SetName(iconTextblock, ResourceAccessor.GetLocalizedStringResource(GetIconSeverityLevelResourceName(Severity)));
 			}
 
 			var contentRootGrid = GetTemplateChild<Button>(c_contentRootName);
@@ -166,6 +189,7 @@ namespace Microsoft.UI.Xaml.Controls
 						{
 							var notificationString = StringUtil.FormatString(
 								ResourceAccessor.GetLocalizedStringResource(ResourceAccessor.SR_InfoBarOpenedNotification),
+								ResourceAccessor.GetLocalizedStringResource(GetIconSeverityLevelResourceName(Severity)),
 								Title,
 								Message);
 
@@ -193,16 +217,27 @@ namespace Microsoft.UI.Xaml.Controls
 			}
 		}
 
-		void UpdateSeverity()
+		private void UpdateSeverity()
 		{
 			var severityState = "Informational";
 
 			switch (Severity)
 			{
-				case InfoBarSeverity.Success: severityState = "Success"; break;
-				case InfoBarSeverity.Warning: severityState = "Warning"; break;
-				case InfoBarSeverity.Error: severityState = "Error"; break;
+				case InfoBarSeverity.Success:
+					severityState = "Success";
+					break;
+				case InfoBarSeverity.Warning:
+					severityState = "Warning";
+					break;
+				case InfoBarSeverity.Error:
+					severityState = "Error";
+					break;
 			};
+
+			if (m_standardIconTextBlock is FrameworkElement iconTextblock)
+			{
+				AutomationProperties.SetName(iconTextblock, ResourceAccessor.GetLocalizedStringResource(GetIconSeverityLevelResourceName(Severity)));
+			}
 
 			VisualStateManager.GoToState(this, severityState, false);
 		}
@@ -222,25 +257,47 @@ namespace Microsoft.UI.Xaml.Controls
 			}
 		}
 
-		void UpdateIconVisibility()
+		private void UpdateIconVisibility()
 		{
 			VisualStateManager.GoToState(this, IsIconVisible ? (IconSource != null ? "UserIconVisible" : "StandardIconVisible") : "NoIconVisible", false);
 		}
 
-		void UpdateCloseButton()
+		private void UpdateCloseButton()
 		{
 			VisualStateManager.GoToState(this, IsClosable ? "CloseButtonVisible" : "CloseButtonCollapsed", false);
 		}
 
-		void OnForegroundChanged(DependencyObject sender, DependencyProperty args)
+		private void OnForegroundChanged(DependencyObject sender, DependencyProperty args)
 		{
 			UpdateForeground();
 		}
 
-		void UpdateForeground()
+		private void UpdateForeground()
 		{
 			// If Foreground is set, then change Title and Message Foreground to match.
 			VisualStateManager.GoToState(this, ReadLocalValue(Control.ForegroundProperty) == DependencyProperty.UnsetValue ? "ForegroundNotSet" : "ForegroundSet", false);
+		}
+
+		private string GetSeverityLevelResourceName(InfoBarSeverity severity)
+		{
+			switch (severity)
+			{
+				case InfoBarSeverity.Success: return "InfoBarSeveritySuccessName";
+				case InfoBarSeverity.Warning: return "InfoBarSeverityWarningName";
+				case InfoBarSeverity.Error: return "InfoBarSeverityErrorName";
+			};
+			return "InfoBarSeverityInformationalName";
+		}
+
+		private string GetIconSeverityLevelResourceName(InfoBarSeverity severity)
+		{
+			switch (severity)
+			{
+				case InfoBarSeverity.Success: return "InfoBarIconSeveritySuccessName";
+				case InfoBarSeverity.Warning: return "InfoBarIconSeverityWarningName";
+				case InfoBarSeverity.Error: return "InfoBarIconSeverityErrorName";
+			};
+			return "InfoBarIconSeverityInformationalName";
 		}
 	}
 }

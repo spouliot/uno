@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using Uno.Extensions;
 using Uno;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.Collections;
 using Windows.Foundation;
 
@@ -38,8 +38,17 @@ namespace Windows.UI.Xaml.Controls
 				// Issue: https://github.com/unoplatform/uno/issues/2879
 			}
 
+			if (view.IsLayoutRequested && view.Parent is View parent && !parent.IsLayoutRequested)
+			{
+				// If a view has requested layout but its Parent hasn't, then the tree is in a broken state, because RequestLayout() calls
+				// cannot bubble up from below the view, and remeasures cannot bubble down from above the parent. This can arise, eg, when
+				// ForceLayout() is used. To fix this state, call RequestLayout() on the parent. Since MeasureChildOverride() is called
+				// from the top down, we should be able to assume that the tree above the parent is already in a good state.
+				parent.RequestLayout();
+			}
+
 			MeasureChild(view, widthSpec, heightSpec);
-			
+
 			var ret = Uno.UI.Controls.BindableView.GetNativeMeasuredDimensionsFast(view)
 				.PhysicalToLogicalPixels();
 
@@ -48,31 +57,16 @@ namespace Windows.UI.Xaml.Controls
 
 		protected abstract void MeasureChild(View view, int widthSpec, int heightSpec);
 
-		private void SetArrangeLogicalSize(View view, Rect frame)
-		{
-			if (view is UIElement uiElement)
-			{
-				uiElement.ArrangeLogicalSize = frame;
-			}
-		}
-
-		private void ResetArrangeLogicalSize(View view)
-		{
-			if (view is UIElement uiElement)
-			{
-				uiElement.ArrangeLogicalSize = null;
-			}
-		}
-
 		protected void ArrangeChildOverride(View view, Rect frame)
 		{
 			LogArrange(view, frame);
 
+			var elt = view as UIElement;
 			var physicalFrame = frame.LogicalToPhysicalPixels();
 
 			try
 			{
-				SetArrangeLogicalSize(view, frame);
+				elt?.SetFramePriorArrange(frame, physicalFrame);
 
 				view.Layout(
 					(int)physicalFrame.Left,
@@ -83,7 +77,7 @@ namespace Windows.UI.Xaml.Controls
 			}
 			finally
 			{
-				ResetArrangeLogicalSize(view);
+				elt?.ResetFramePostArrange();
 			}
 		}
 	}

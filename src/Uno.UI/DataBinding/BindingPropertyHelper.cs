@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using System.Globalization;
 using System.Reflection;
 using Uno.UI.DataBinding;
@@ -15,9 +15,10 @@ using Uno;
 using Windows.UI.Xaml;
 using System.Collections;
 using Uno.Conversion;
-using Microsoft.Extensions.Logging;
+
 using Windows.UI.Xaml.Data;
 using System.Dynamic;
+using System.Runtime.CompilerServices;
 
 namespace Uno.UI.DataBinding
 {
@@ -39,7 +40,7 @@ namespace Uno.UI.DataBinding
 
     internal static partial class BindingPropertyHelper
 	{
-		private static readonly ILogger _log = typeof(BindingPropertyHelper).Log();
+		private static readonly Logger _log = typeof(BindingPropertyHelper).Log();
 
 		//
 		// Warning: These dictionaries are here in place of memoized Funcs for performance
@@ -59,6 +60,17 @@ namespace Uno.UI.DataBinding
 		{
 			MethodInvokerBuilder = DefaultInvokerBuilder;
 			Conversion = new DefaultConversionExtensions();
+		}
+
+		internal static void ClearCaches()
+		{
+			_getValueGetter.Clear();
+			_getValueSetter.Clear();
+			_getPrecedenceSpecificValueGetter.Clear();
+			_getSubstituteValueGetter.Clear();
+			_getValueUnsetter.Clear();
+			_isEvent.Clear();
+			_getPropertyType.Clear();
 		}
 
 		private static Func<object, object?[], object?> DefaultInvokerBuilder(MethodInfo method)
@@ -127,7 +139,7 @@ namespace Uno.UI.DataBinding
 		{
 			var key = CachedTuple.Create(type, property, precedence, allowPrivateMembers);
 
-			ValueGetterHandler result;
+			ValueGetterHandler? result;
 
 			lock (_getValueGetter)
 			{
@@ -149,7 +161,7 @@ namespace Uno.UI.DataBinding
 		{
 			var key = CachedTuple.Create(type, property, convert, precedence);
 
-			ValueSetterHandler result;
+			ValueSetterHandler? result;
 
 			lock (_getValueSetter)
 			{
@@ -166,7 +178,7 @@ namespace Uno.UI.DataBinding
 		{
 			var key = CachedTuple.Create(type, property, precedence);
 
-			ValueGetterHandler result;
+			ValueGetterHandler? result;
 
 			lock (_getPrecedenceSpecificValueGetter)
 			{
@@ -183,7 +195,7 @@ namespace Uno.UI.DataBinding
 		{
 			var key = CachedTuple.Create(type, property, precedence);
 
-			ValueGetterHandler result;
+			ValueGetterHandler? result;
 
 			lock (_getSubstituteValueGetter)
 			{
@@ -205,7 +217,7 @@ namespace Uno.UI.DataBinding
 		{
 			var key = CachedTuple.Create(type, property, precedence);
 
-			ValueUnsetterHandler result;
+			ValueUnsetterHandler? result;
 
 			lock (_getValueUnsetter)
 			{
@@ -240,7 +252,7 @@ namespace Uno.UI.DataBinding
 			using (Performance.Measure("InternalGetPropertyType"))
 #endif
 			{
-				if (BindableMetadataProvider != null)
+				if (IsValidMetadataProviderType(type) && BindableMetadataProvider != null)
 				{
 					var bindablePropertyDescriptor = BindablePropertyDescriptor.GetPropertByBindableMetadataProvider(type, property);
 
@@ -274,7 +286,7 @@ namespace Uno.UI.DataBinding
 				using (Performance.Measure("InternalGetPropertyType.Reflection"))
 #endif
 				{
-					if (_log.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+					if (_log.IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 					{
 						_log.Debug($"GetPropertyType({type}, {property}) [Reflection]");
 					}
@@ -321,7 +333,7 @@ namespace Uno.UI.DataBinding
 						return attachedPropertyGetter.ReturnType;
 					}
 
-					if(type.IsPrimitive && property == "Value")
+					if (type.IsPrimitive && property == "Value")
 					{
 						// This case is trying assuming that Value for a primitive is used for the case
 						// of a Nullable primitive.
@@ -369,7 +381,7 @@ namespace Uno.UI.DataBinding
 					return info;
 				}
 
-				type = type.BaseType;
+				type = type.BaseType!;
 			}
 			while (type != null);
 
@@ -394,7 +406,7 @@ namespace Uno.UI.DataBinding
 					return info;
 				}
 
-				type = type.BaseType;
+				type = type.BaseType!;
 			}
 			while (type != null);
 
@@ -509,7 +521,7 @@ namespace Uno.UI.DataBinding
 				}
 
 				// Start by using the provider, to avoid reflection
-				if (BindableMetadataProvider != null)
+				if (IsValidMetadataProviderType(type) && BindableMetadataProvider != null)
 				{
 #if PROFILE
 					using (Performance.Measure("GetValueGetter.BindableMetadataProvider"))
@@ -533,7 +545,7 @@ namespace Uno.UI.DataBinding
 				using (Performance.Measure("InternalGetValueGetter.Reflection"))
 #endif
 				{
-					if (_log.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+					if (_log.IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 					{
 						_log.Debug($"GetValueGetter({type}, {property}) [Reflection]");
 					}
@@ -579,7 +591,7 @@ namespace Uno.UI.DataBinding
 			}
 
 			// Start by using the provider, to avoid reflection
-			if (BindableMetadataProvider != null)
+			if (IsValidMetadataProviderType(type) && BindableMetadataProvider != null)
 			{
 #if PROFILE
 				using (Performance.Measure("GetValueGetter.BindableMetadataProvider"))
@@ -609,7 +621,7 @@ namespace Uno.UI.DataBinding
 			using (Performance.Measure("InternalGetValueGetter.Reflection2"))
 #endif
 			{
-				if (_log.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (_log.IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					_log.Debug($"GetValueGetter({type}, {property}) [Reflection]");
 				}
@@ -760,7 +772,7 @@ namespace Uno.UI.DataBinding
 
 
 				// Start by using the provider, to avoid reflection
-				if (BindableMetadataProvider != null)
+				if (IsValidMetadataProviderType(type) && BindableMetadataProvider != null)
 				{
 #if PROFILE
 					using (Performance.Measure("GetValueSetter.BindableMetadataProvider"))
@@ -792,7 +804,7 @@ namespace Uno.UI.DataBinding
 				using (Performance.Measure("InternalGetValueSetter.Reflection"))
 #endif
 				{
-					if (_log.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+					if (_log.IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 					{
 						_log.Debug($"GetValueSetter({type}, {property}) [Reflection]");
 					}
@@ -829,7 +841,7 @@ namespace Uno.UI.DataBinding
 			}
 
 			// Start by using the provider, to avoid reflection
-			if (BindableMetadataProvider != null)
+			if (IsValidMetadataProviderType(type) && BindableMetadataProvider != null)
 			{
 #if PROFILE
 				using (Performance.Measure("GetValueSetter.BindableMetadataProvider"))
@@ -867,7 +879,7 @@ namespace Uno.UI.DataBinding
 			using (Performance.Measure("InternalGetValueSetter.Reflection"))
 #endif
 			{
-				if (_log.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (_log.IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					_log.Debug($"GetValueSetter({type}, {property}) [Reflection]");
 				}
@@ -1036,7 +1048,7 @@ namespace Uno.UI.DataBinding
 			return null;
 		}
 
-		private static MethodInfo GetAttachedPropertyGetter(Type type, string property)
+		private static MethodInfo? GetAttachedPropertyGetter(Type type, string property)
 		{
 			var propertyInfo = DependencyPropertyDescriptor.Parse(property);
 
@@ -1066,21 +1078,34 @@ namespace Uno.UI.DataBinding
 					}
 					else if (t != typeof(object))
 					{
-						try
-						{
-							value = Conversion.To(value, t, CultureInfo.CurrentCulture);
-						}
-						catch (Exception)
-						{
-							// This is a temporary fallback solution.
-							// The problem is that we don't actually know which culture we must use in advance.
-							// Values can come from the xaml (invariant culture) or from a two way binding (current culture).
-							// The real solution would be to pass a culture or source when setting a value in a Dependency Property.
-							value = Conversion.To(value, t, CultureInfo.InvariantCulture);
-						}
+						value = ConvertWithConvertionExtension(value, t);
 					}
 				}
 			}
+			return value;
+		}
+
+		/// <remarks>
+		/// This method contains or is called by a try/catch containing method and
+		/// can be significantly slower than other methods as a result on WebAssembly.
+		/// See https://github.com/dotnet/runtime/issues/56309
+		/// </remarks>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static object ConvertWithConvertionExtension(object? value, Type? t)
+		{
+			try
+			{
+				value = Conversion.To(value, t, CultureInfo.CurrentCulture);
+			}
+			catch (Exception)
+			{
+				// This is a temporary fallback solution.
+				// The problem is that we don't actually know which culture we must use in advance.
+				// Values can come from the xaml (invariant culture) or from a two way binding (current culture).
+				// The real solution would be to pass a culture or source when setting a value in a Dependency Property.
+				value = Conversion.To(value, t, CultureInfo.InvariantCulture);
+			}
+
 			return value;
 		}
 
@@ -1088,6 +1113,13 @@ namespace Uno.UI.DataBinding
 			=> DependencyProperty.UnsetValue;
 
 		private static void UnsetValueSetter(object unused, object? unused2) { }
+
+		/// <summary>
+		/// Determines if the type can be provided by the MetadataProvider
+		/// </summary>
+		/// <remarks>This method needs to be aligned with the symbols query in BindableTypeProvidersSourceGenerator.</remarks>
+		private static bool IsValidMetadataProviderType(Type type)
+			=> type.IsPublic && type.IsClass;
 	}
 }
 #endif

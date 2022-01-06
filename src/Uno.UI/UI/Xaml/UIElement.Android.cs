@@ -22,29 +22,55 @@ namespace Windows.UI.Xaml
 	public partial class UIElement : BindableView
 	{
 		/// <summary>
-		/// Returns true if this element has children and they are all native (non-UIElements), false if it has no children or if at
-		/// least one is a UIElement.
+		/// Keeps the count of native children (non-UIElements), for clipping purpoess.
 		/// </summary>
-		private bool AreChildrenNativeViewsOnly
+		private int _nativeChildrenCount;
+		private bool _nativeClipChildren;
+
+		private Rect _previousClip = Rect.Empty;
+
+		private void ComputeAreChildrenNativeViewsOnly()
 		{
-			get
+			var nativeClipChildren = (this as IShadowChildrenProvider).ChildrenShadow.Count == _nativeChildrenCount;
+
+			if (_nativeClipChildren != nativeClipChildren)
 			{
-				var shadow = (this as IShadowChildrenProvider).ChildrenShadow;
-				if (shadow.Count == 0)
-				{
-					return false;
-				}
+				_nativeClipChildren = nativeClipChildren;
 
-				foreach (var child in shadow)
-				{
-					if (child is UIElement)
-					{
-						return false;
-					}
-				}
-
-				return true;
+				// Non-UIElements typically expect to be clipped, and display incorrectly otherwise
+				// This won't work when UIElements and non-UIElements are mixed in the same Panel,
+				// but it should cover most cases in practice, and anyway should be superceded when
+				// IFrameworkElement will be removed.
+				SetClipChildren(FeatureConfiguration.UIElement.AlwaysClipNativeChildren ? _nativeClipChildren : false);
 			}
+		}
+
+		protected override void OnLocalViewRemoved(View view)
+		{
+			base.OnLocalViewRemoved(view);
+
+			if (!(view is UIElement))
+			{
+				_nativeChildrenCount--;
+			}
+
+			ComputeAreChildrenNativeViewsOnly();
+		}
+
+		/// <summary>
+		/// Invoked when a child view has been added.
+		/// </summary>
+		/// <param name="view">The view being removed</param>
+		protected override void OnChildViewAdded(View view)
+		{
+			base.OnChildViewAdded(view);
+
+			if(!(view is UIElement))
+			{
+				_nativeChildrenCount++;
+			}
+
+			ComputeAreChildrenNativeViewsOnly();
 		}
 
 		public UIElement()
@@ -53,7 +79,6 @@ namespace Windows.UI.Xaml
 			Initialize();
 			InitializePointers();
 		}
-
 
 		/// <summary>
 		/// Determines if InvalidateMeasure has been called
@@ -65,21 +90,64 @@ namespace Windows.UI.Xaml
 		/// </summary>
 		internal bool IsArrangeDirty => IsLayoutRequested;
 
+		/// <summary>
+		/// Gets the **logical** frame (a.k.a. 'finalRect') of the element while it's being arranged by a managed parent.
+		/// </summary>
+		/// <remarks>Used to keep "double" precision of arrange phase.</remarks>
+		private protected Rect? TransientArrangeFinalRect { get; private set; }
+
+		/// <summary>
+		/// The difference between the physical layout width and height taking the origin into account,
+		/// and the physical width and height that would've been calculated for an origin of (0,0).
+		/// The difference may be -1,0, or +1 pixels due to different roundings.
+		///
+		/// (Eg, consider a Grid that is 31 logical pixels high, with 3 children with alignment Stretch in successive Star-sized rows.
+		/// Each child will be measured with a logical height of 10.3, and logical origins of 0, 10.3, and 20.6.  Assume the device scale is 1.
+		/// The child origins will be converted to 0, 10, and 21 respectively in integer pixel values; this will give heights of 10, 11, and 10 pixels.
+		/// The FrameRoundingAdjustment values will be (0,0), (0,1), and (0,0) respectively.
+		/// </summary>
+		internal Size? FrameRoundingAdjustment { get; set; }
+
+		internal void SetFramePriorArrange(Rect frame /* a.k.a 'finalRect' */, Rect physicalFrame)
+		{
+			var physicalWidth = ViewHelper.LogicalToPhysicalPixels(frame.Width);
+			var physicalHeight = ViewHelper.LogicalToPhysicalPixels(frame.Height);
+
+			TransientArrangeFinalRect = frame;
+			FrameRoundingAdjustment = new Size(
+				(int)physicalFrame.Width - physicalWidth,
+				(int)physicalFrame.Height - physicalHeight);
+		}
+
+		internal void ResetFramePostArrange()
+		{
+			TransientArrangeFinalRect = null;
+		}
+
 		partial void ApplyNativeClip(Rect rect)
 		{
-			// Non-UIElements typically expect to be clipped, and display incorrectly otherwise
-			// This won't work when UIElements and non-UIElements are mixed in the same Panel,
-			// but it should cover most cases in practice, and anyway should be superceded when
-			// IFrameworkElement will be removed.
-			SetClipChildren(FeatureConfiguration.UIElement.AlwaysClipNativeChildren ? AreChildrenNativeViewsOnly : false);
-
 			if (rect.IsEmpty)
 			{
-				ViewCompat.SetClipBounds(this, null);
+				if (_previousClip != rect)
+				{
+					_previousClip = rect;
+
+					ViewCompat.SetClipBounds(this, null);
+				}
+
 				return;
 			}
 
-			ViewCompat.SetClipBounds(this, rect.LogicalToPhysicalPixels());
+			_previousClip = rect;
+
+			var physicalRect = rect.LogicalToPhysicalPixels();
+			if (FrameRoundingAdjustment is { } fra)
+			{
+				physicalRect.Width += fra.Width;
+				physicalRect.Height += fra.Height;
+			}
+
+			ViewCompat.SetClipBounds(this, physicalRect);
 
 			SetClipChildren(NeedsClipToSlot);
 		}
@@ -222,7 +290,7 @@ namespace Windows.UI.Xaml
 			}
 		}
 
-		protected virtual void OnVisibilityChanged(Visibility oldValue, Visibility newValue)
+		partial void OnVisibilityChangedPartial(Visibility oldValue, Visibility newValue)
 		{
 			var newNativeVisibility = newValue == Visibility.Visible ? Android.Views.ViewStates.Visible : Android.Views.ViewStates.Gone;
 
@@ -336,7 +404,9 @@ namespace Windows.UI.Xaml
 			}
 			else if (type == typeof(sbyte))
 			{
+#pragma warning disable CS0618 // Byte.Byte(sbyte) is obsolete in API 31
 				return new Java.Lang.Byte((sbyte)dpValue);
+#pragma warning restore CS0618 // Byte.Byte(sbyte) is obsolete in API 31
 			}
 			else if (type == typeof(char))
 			{
@@ -344,7 +414,9 @@ namespace Windows.UI.Xaml
 			}
 			else if (type == typeof(short))
 			{
+#pragma warning disable CS0618 // Short.Short(short) is obsolete in API 31
 				return new Java.Lang.Short((short)dpValue);
+#pragma warning restore CS0618 // Short.Short(short) is obsolete in API 31
 			}
 			else if (type == typeof(int))
 			{
@@ -370,8 +442,6 @@ namespace Windows.UI.Xaml
 			// If all else fails, just return the string representation of the DP's value
 			return new Java.Lang.String(dpValue.ToString());
 		}
-
-		internal Rect? ArrangeLogicalSize { get; set; } // Used to keep "double" precision of arrange phase
 
 #if DEBUG
 		public static Predicate<View> ViewOfInterestSelector { get; set; } = v => (v as FrameworkElement)?.Name == "TargetView";

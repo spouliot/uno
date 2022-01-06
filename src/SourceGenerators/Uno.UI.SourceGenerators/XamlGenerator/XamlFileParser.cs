@@ -1,4 +1,5 @@
-﻿#nullable enable
+﻿extern alias __uno;
+#nullable enable
 
 using System;
 using System.Collections.Generic;
@@ -7,7 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using Uno.Extensions;
-using Uno.Logging;
 using System.IO;
 using System.Reflection;
 using Uno.UI.SourceGenerators.XamlGenerator.XamlRedirection;
@@ -33,22 +33,25 @@ namespace Uno.UI.SourceGenerators.XamlGenerator
 			this._metadataHelper = roslynMetadataHelper;
 		}
 
-		public XamlFileDefinition[] ParseFiles(string[] xamlSourceFiles)
+		public XamlFileDefinition[] ParseFiles(string[] xamlSourceFiles, System.Threading.CancellationToken cancellationToken)
 		{
 			var files = new List<XamlFileDefinition>();
 
 			return xamlSourceFiles
 				.AsParallel()
-				.Select(ParseFile)
+				.WithCancellation(cancellationToken)
+				.Select(f => ParseFile(f, cancellationToken))
 				.Where(f => f != null)
 				.ToArray()!;
 		}
 
-		private XamlFileDefinition? ParseFile(string file)
+		private XamlFileDefinition? ParseFile(string file, System.Threading.CancellationToken cancellationToken)
 		{
 			try
 			{
-				this.Log().InfoFormat("Pre-processing XAML file: {0}", file);
+#if DEBUG
+				Console.WriteLine("Pre-processing XAML file: {0}", file);
+#endif
 
 				var document = ApplyIgnorables(file);
 
@@ -64,15 +67,29 @@ namespace Uno.UI.SourceGenerators.XamlGenerator
 				{
 					if (reader.Read())
 					{
+						cancellationToken.ThrowIfCancellationRequested();
+
 						return Visit(reader, file);
 					}
 				}
 
 				return null;
 			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (__uno::Uno.Xaml.XamlParseException e)
+			{
+				throw new XamlParsingException(e.Message, null, e.LineNumber, e.LinePosition, file);
+			}
+			catch (XmlException e)
+			{
+				throw new XamlParsingException(e.Message, null, e.LineNumber, e.LinePosition, file);
+			}
 			catch (Exception e)
 			{
-				throw new InvalidOperationException($"Failed to parse file {file}", e);
+				throw new XamlParsingException($"Failed to parse file", e, 1, 1, file);
 			}
 		}
 
@@ -111,7 +128,9 @@ namespace Uno.UI.SourceGenerators.XamlGenerator
 			{
 				ignorables.Value = newIgnoredFlat;
 
-				this.Log().InfoFormat("Ignorable XAML namespaces: {0} for {1}", ignorables.Value, file);
+#if DEBUG
+				Console.WriteLine("Ignorable XAML namespaces: {0} for {1}", ignorables.Value, file);
+#endif
 
 				// change the namespaces using textreplace, to keep the formatting and have proper
 				// line/position reporting.
@@ -453,7 +472,7 @@ namespace Uno.UI.SourceGenerators.XamlGenerator
 		private bool IsLiteralInlineText(object value, XamlMemberDefinition member, XamlObjectDefinition xamlObject)
 		{
 			return value is string
-				&& xamlObject.Type.Name == "TextBlock"
+				&& (xamlObject.Type.Name == "TextBlock" || xamlObject.Type.Name == "Span")
 				&& (member.Member.Name == "_UnknownContent" || member.Member.Name == "Inlines");
 		}
 

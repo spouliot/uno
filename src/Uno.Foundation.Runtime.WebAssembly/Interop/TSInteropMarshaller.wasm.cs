@@ -1,20 +1,19 @@
 ﻿#nullable enable
 // #define TRACE_MEMORY_LAYOUT
 
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using Uno.Extensions;
 using Uno.Foundation;
+using Uno.Foundation.Logging;
 
 namespace Uno.Foundation.Interop
 {
-	internal static class TSInteropMarshaller
+	internal static partial class TSInteropMarshaller
 	{
-		private static readonly Lazy<ILogger> _logger = new Lazy<ILogger>(() => typeof(TSInteropMarshaller).Log());
+		private static readonly Logger _logger = typeof(TSInteropMarshaller).Log();
 
 		public const UnmanagedType LPUTF8Str = (UnmanagedType)48;
 
@@ -27,9 +26,9 @@ namespace Uno.Foundation.Interop
 			var paramStructType = paramStruct.GetType();
 			var paramSize = Marshal.SizeOf(paramStruct);
 
-			if (_logger.Value.IsEnabled(LogLevel.Trace))
+			if (_logger.IsEnabled(LogLevel.Trace))
 			{
-				_logger.Value.LogTrace($"InvokeJS for {memberName}/{paramStructType} (Alloc: {paramSize})");
+				_logger.Trace($"InvokeJS for {memberName}/{paramStructType} (Alloc: {paramSize})");
 			}
 
 			var pParms = Marshal.AllocHGlobal(paramSize);
@@ -45,9 +44,9 @@ namespace Uno.Foundation.Interop
 
 			if (exception != null)
 			{
-				if (_logger.Value.IsEnabled(LogLevel.Error))
+				if (_logger.IsEnabled(LogLevel.Error))
 				{
-					_logger.Value.LogError($"Failed InvokeJS for {memberName}/{paramStructType}: {exception}");
+					_logger.Error($"Failed InvokeJS for {memberName}/{paramStructType}: {exception}");
 				}
 
 				throw exception;
@@ -66,9 +65,9 @@ namespace Uno.Foundation.Interop
 			var returnSize = Marshal.SizeOf(retStructType);
 			var paramSize = Marshal.SizeOf(paramStructType);
 
-			if (_logger.Value.IsEnabled(LogLevel.Trace))
+			if (_logger.IsEnabled(LogLevel.Trace))
 			{
-				_logger.Value.LogTrace($"InvokeJS for {memberName}/{paramStructType}/{retStructType} (paramSize: {paramSize}, returnSize: {returnSize}");
+				_logger.Trace($"InvokeJS for {memberName}/{paramStructType}/{retStructType} (paramSize: {paramSize}, returnSize: {returnSize}");
 			}
 
 			DumpStructureLayout(paramStructType);
@@ -88,9 +87,9 @@ namespace Uno.Foundation.Interop
 			}
 			catch (Exception e)
 			{
-				if (_logger.Value.IsEnabled(LogLevel.Error))
+				if (_logger.IsEnabled(LogLevel.Error))
 				{
-					_logger.Value.LogDebug($"Failed InvokeJS for {memberName}/{paramStructType}: {e}");
+					_logger.Debug($"Failed InvokeJS for {memberName}/{paramStructType}: {e}");
 				}
 				throw;
 			}
@@ -102,6 +101,53 @@ namespace Uno.Foundation.Interop
 				Marshal.DestroyStructure(pReturnValue, retStructType);
 				Marshal.FreeHGlobal(pReturnValue);
 			}
+		}
+
+		/// <summary>
+		/// Allocates a shared instance of <typeparamref name="T"/> between JavaScript and managed code.
+		/// </summary>
+		/// <typeparam name="T">Type of the shared instance.</typeparam>
+		/// <param name="propertySetterName">
+		/// Javascript method name to invoke to "set" the pointer to the marshaled instance.
+		/// The method must accepts a single number argument which is the pointer.
+		/// </param>
+		/// <param name="propertyResetName">
+		/// Javascript method name to invoke to "unset" the pointer to the marshaled instance.
+		/// This will be invoked when the resulting <see cref="HandleRef{T}"/> is being disposed.
+		/// The method must accepts a single number argument which is the pointer.
+		/// </param>
+		/// <remarks>
+		/// <paramref name="propertySetterName"/> and <paramref name="propertyResetName"/> methods must use the <see cref="InvokeJS(string,object,string?)"/> syntax.
+		/// (I.e. no direct javascript code!)
+		/// </remarks>
+		/// <returns>A reference to the shared instance.</returns>
+		public static HandleRef<T> Allocate<T>(string propertySetterName, string? propertyResetName = null)
+			where T : struct
+		{
+			var value = new HandleRef<T>(propertyResetName);
+			try
+			{
+				WebAssemblyRuntime.InvokeJSUnmarshalled(propertySetterName, value.Handle);
+			}
+			catch (Exception e)
+			{
+				try
+				{
+					value.Dispose();
+				}
+				// If the allocation failed, the dispose will most likely also fail,
+				// but we want to propagate the real exception of the allocation!
+				catch (Exception) { }
+
+				if (_logger.IsEnabled(LogLevel.Error))
+				{
+					_logger.Debug($"Failed Allocate {propertySetterName}/{value.Type}: {e}");
+				}
+
+				throw;
+			}
+
+			return value;
 		}
 
 #if TRACE_MEMORY_LAYOUT

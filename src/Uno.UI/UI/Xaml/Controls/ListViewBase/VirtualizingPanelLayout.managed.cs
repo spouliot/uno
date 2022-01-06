@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Microsoft.Extensions.Logging;
+
 using Uno.Extensions;
 using Uno.UI;
 using Windows.Foundation;
@@ -17,6 +17,8 @@ using static Windows.UI.Xaml.Controls.Primitives.GeneratorDirection;
 using Uno.UI.Extensions;
 using System.Collections.Specialized;
 using Uno.UI.Xaml.Controls;
+using DirectUI;
+using Uno.Foundation.Logging;
 #if __MACOS__
 using AppKit;
 #elif __IOS__
@@ -51,7 +53,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private ScrollViewer? ScrollViewer { get; set; }
 		internal ItemsControl? ItemsControl { get; set; }
-		public ListViewBase? XamlParent => ItemsControl as ListViewBase;
+		internal ItemsControl? XamlParent => ItemsControl;
 
 		/// <summary>
 		/// Ordered record of all currently-materialized lines.
@@ -168,6 +170,9 @@ namespace Windows.UI.Xaml.Controls
 
 		private bool ShouldMeasuredBreadthStretch => ShouldBreadthStretch && GetBreadth(_availableSize) < double.MaxValue / 2;
 
+		// TODO: this should be adjusted when header, group headers etc are implemented
+		private double PositionOfFirstElement => 0;
+
 		internal void Initialize(_Panel owner)
 		{
 			OwnerPanel = owner ?? throw new ArgumentNullException(nameof(owner));
@@ -223,7 +228,7 @@ namespace Windows.UI.Xaml.Controls
 			ItemsControl = null;
 		}
 
-		private void OnScrollChanged(object sender, ScrollViewerViewChangedEventArgs e)
+		private void OnScrollChanged(object? sender, ScrollViewerViewChangedEventArgs e)
 		{
 			if (this.Log().IsEnabled(LogLevel.Debug))
 			{
@@ -357,6 +362,8 @@ namespace Windows.UI.Xaml.Controls
 			UnfillLayout(extentAdjustment ?? 0);
 			FillLayout(extentAdjustment ?? 0);
 
+			CorrectForEstimationErrors();
+
 			if (this.Log().IsEnabled(LogLevel.Debug))
 			{
 				this.Log().LogDebug($"Called {GetMethodTag()}, {GetDebugInfo()} extentAdjustment={extentAdjustment}");
@@ -398,7 +405,7 @@ namespace Windows.UI.Xaml.Controls
 			FillForward();
 
 			// Make sure that the reorder item has been rendered
-			if (GetReorderingIndex() is { } reorderIndex && _materializedLines.None(line => line.Contains(reorderIndex)))
+			if (GetAndUpdateReorderingIndex() is { } reorderIndex && _materializedLines.None(line => line.Contains(reorderIndex)))
 			{
 				AddLine(Forward, reorderIndex);
 			}
@@ -486,6 +493,42 @@ namespace Windows.UI.Xaml.Controls
 			for (int i = 0; i < line.Items.Length; i++)
 			{
 				Generator.ScrapViewForItem(line.Items[i].container, line.FirstItemFlat + i);
+			}
+		}
+
+		/// <summary>
+		/// Item positions relative to the start of the panel are an estimate, which may be incorrect eg if unmaterialized items were added/removed
+		/// or had their databound heights changed. Here we try to correct it.
+		/// </summary>
+		void CorrectForEstimationErrors()
+		{
+			if (GetFirstMaterializedLine() is { } firstLine)
+			{
+				var neededCorrection = 0d;
+				var start = GetMeasuredStart(firstLine.FirstView);
+				if (firstLine.FirstItemFlat == 0)
+				{
+					neededCorrection = -start;
+				}
+				else if (start < PositionOfFirstElement)
+				{
+					// TODO: this is crude, the better approach (and in line with Windows) would be to estimate the position of the element, and use that
+					neededCorrection = -start;
+				}
+
+				// If the needed correction is non-zero, run through all our elements and apply the correction to their bounds
+				if (!DoubleUtil.IsZero(neededCorrection))
+				{
+					foreach (var line in _materializedLines)
+					{
+						foreach (var item in line.Items)
+						{
+							var bounds = GetBoundsForElement(item.container);
+							IncrementStart(ref bounds, neededCorrection);
+							SetBounds(item.container, bounds);
+						}
+					}
+				}
 			}
 		}
 
@@ -652,7 +695,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private double CalculatePanelMeasureBreadth() => _materializedLines.Select(l => GetDesiredBreadth(l.FirstView)).MaxOrDefault()
 #if __WASM__
-			+ GetBreadth(XamlParent.ScrollViewer.ScrollBarSize)
+			+ GetBreadth(XamlParent?.ScrollViewer.ScrollBarSize ?? default)
 #endif
 				;
 
@@ -724,7 +767,7 @@ namespace Windows.UI.Xaml.Controls
 		private void ScrapLayout()
 		{
 			var firstVisibleItem = GetFirstMaterializedIndexPath();
-			if (GetReorderingIndex() is { } reorderIndex && reorderIndex == firstVisibleItem)
+			if (GetAndUpdateReorderingIndex() is { } reorderIndex && reorderIndex == firstVisibleItem)
 			{
 				firstVisibleItem = _materializedLines.SelectMany(line => line.Items).Skip(1).FirstOrDefault().index;
 			}
@@ -749,7 +792,7 @@ namespace Windows.UI.Xaml.Controls
 		/// </summary>
 		protected virtual Uno.UI.IndexPath? GetDynamicSeedIndex(Uno.UI.IndexPath? firstVisibleItem)
 		{
-			var lastItem = XamlParent?.GetLastItem();
+			var lastItem = ItemsControl?.GetLastItem();
 			if (lastItem == null ||
 				(firstVisibleItem != null && firstVisibleItem.Value > lastItem.Value)
 			)
@@ -971,6 +1014,17 @@ namespace Windows.UI.Xaml.Controls
 			}
 		}
 
+		private void IncrementStart(ref Rect rect, double startIncrement)
+		{
+			if (ScrollOrientation == Orientation.Vertical)
+			{
+				rect.Y += startIncrement;
+			}
+			else
+			{
+				rect.X += startIncrement;
+			}
+		}
 
 		private double GetActualBreadth(FrameworkElement view) => ScrollOrientation == Orientation.Vertical ?
 			view.ActualWidth :
@@ -998,10 +1052,10 @@ namespace Windows.UI.Xaml.Controls
 		private static Point GetRelativePosition(FrameworkElement child) => new Point(ViewHelper.PhysicalToLogicalPixels(child.Left), ViewHelper.PhysicalToLogicalPixels(child.Top));
 #endif
 
-		private (double offset, double breadth, object item, Uno.UI.IndexPath? index)? _pendingReorder;
+		private (double offset, double extent, object item, Uno.UI.IndexPath? index)? _pendingReorder;
 		internal void UpdateReorderingItem(Point location, FrameworkElement element, object item)
 		{
-			_pendingReorder = Orientation == Orientation.Horizontal
+			_pendingReorder = ScrollOrientation == Orientation.Horizontal
 				? (location.X + ScrollOffset, element.ActualWidth, item, default(Uno.UI.IndexPath?))
 				: (location.Y + ScrollOffset, element.ActualHeight, item, default(Uno.UI.IndexPath?));
 
@@ -1033,16 +1087,20 @@ namespace Windows.UI.Xaml.Controls
 		}
 
 		protected bool ShouldInsertReorderingView(double extentOffset)
-			=> _pendingReorder is { } reorder && reorder.offset > extentOffset && reorder.offset <= extentOffset + reorder.breadth;
+			=> _pendingReorder is { } reorder && reorder.offset > extentOffset && reorder.offset <= extentOffset + reorder.extent;
 
-		protected Uno.UI.IndexPath? GetReorderingIndex()
+		protected Uno.UI.IndexPath? GetAndUpdateReorderingIndex()
 		{
 			if (_pendingReorder is { } reorder)
 			{
 				if (reorder.index is null)
 				{
-					reorder.index = XamlParent!.GetIndexPathFromItem(reorder.item);
-					_pendingReorder = reorder; // _pendingReorder is a struct!
+					var itemIndex = ItemsControl!.GetIndexPathFromItem(reorder.item);
+					if (itemIndex.Row >= 0) // GetIndexPathFromItem() will return Row=-1 if item is not found, which may happen eg if it's been removed from the collection during dragging. Prefer to leave index null in this case.
+					{
+						reorder.index = itemIndex;
+						_pendingReorder = reorder; // _pendingReorder is a struct! 
+					}
 				}
 
 				return reorder.index;
@@ -1055,7 +1113,7 @@ namespace Windows.UI.Xaml.Controls
 		{
 			if (_pendingReorder is { } reorder)
 			{
-				_pendingReorder = (reorder.offset, reorder.breadth, reorder.item, null);
+				_pendingReorder = (reorder.offset, reorder.extent, reorder.item, null);
 			}
 		}
 

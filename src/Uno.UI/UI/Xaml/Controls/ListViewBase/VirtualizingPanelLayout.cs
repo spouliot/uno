@@ -83,19 +83,20 @@ namespace Windows.UI.Xaml.Controls
 		{
 			get
 			{
-				if (XamlParent == null)
+				var parentList = XamlParent as ListViewBase;
+				if (parentList == null)
 				{
 					return default;
 				}
 
 				if (ScrollOrientation == Orientation.Vertical)
 				{
-					return XamlParent.ScrollViewer.VerticalSnapPointsType;
+					return parentList.ScrollViewer.VerticalSnapPointsType;
 				}
 
 				else
 				{
-					return XamlParent.ScrollViewer.HorizontalSnapPointsType;
+					return parentList.ScrollViewer.HorizontalSnapPointsType;
 				}
 			}
 		}
@@ -104,19 +105,20 @@ namespace Windows.UI.Xaml.Controls
 		{
 			get
 			{
-				if (XamlParent == null)
+				var parentList = XamlParent as ListViewBase;
+				if (parentList == null)
 				{
 					return default;
 				}
 
 				if (ScrollOrientation == Orientation.Vertical)
 				{
-					return XamlParent.ScrollViewer.VerticalSnapPointsAlignment;
+					return parentList.ScrollViewer.VerticalSnapPointsAlignment;
 				}
 
 				else
 				{
-					return XamlParent.ScrollViewer.HorizontalSnapPointsAlignment;
+					return parentList.ScrollViewer.HorizontalSnapPointsAlignment;
 				}
 			}
 		}
@@ -235,7 +237,7 @@ namespace Windows.UI.Xaml.Controls
 
 			// We consider the pending reorder item as non materializable and we ignore it while filling the layout.
 			// It's then the responsibility of the layout to render it at the appropriate slot
-			if (index is {} && GetReorderingIndex() is {} reorderIndex && index == reorderIndex)
+			if (index is {} && GetAndUpdateReorderingIndex() is {} reorderIndex && index == reorderIndex)
 			{
 				index = XamlParent?.GetNextItemIndex(index, direction);
 			}

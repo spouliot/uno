@@ -7,7 +7,7 @@ using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using System.Collections.Generic;
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.Disposables;
 using System.Linq;
 using Windows.Devices.Input;
@@ -22,10 +22,15 @@ using System.Collections;
 using System.Numerics;
 using System.Reflection;
 using Windows.UI.Xaml.Markup;
-using Microsoft.Extensions.Logging;
+
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Core;
 using System.Text;
+using Uno.UI.Xaml;
+using Windows.UI.Xaml.Automation.Peers;
+using Uno.UI.Xaml.Core;
+using Uno.UI.Xaml.Input;
+using System.Runtime.CompilerServices;
 
 #if __IOS__
 using UIKit;
@@ -65,6 +70,7 @@ namespace Windows.UI.Xaml
 		/// <summary>
 		/// Is this view the top of the managed visual tree
 		/// </summary>
+		/// <remarks>This differs from the XamlRoot be being true for the root element of a native Popup.</remarks>
 		internal bool IsVisualTreeRoot { get; set; }
 
 		private void Initialize()
@@ -72,11 +78,18 @@ namespace Windows.UI.Xaml
 			this.RegisterDefaultValueProvider(OnGetDefaultValue);
 		}
 
+		private protected virtual bool IsTabStopDefaultValue => false;
+
 		private bool OnGetDefaultValue(DependencyProperty property, out object defaultValue)
 		{
 			if (property == KeyboardAcceleratorsProperty)
 			{
 				defaultValue = new List<KeyboardAccelerator>(0);
+				return true;
+			}
+			else if (property == IsTabStopProperty)
+			{
+				defaultValue = IsTabStopDefaultValue;
 				return true;
 			}
 
@@ -233,12 +246,60 @@ namespace Windows.UI.Xaml
 		}
 		#endregion
 
+		/// <summary>
+		/// Attempts to set the focus on the UIElement.
+		/// </summary>
+		/// <param name="value">Specifies how focus was set, as a value of the enumeration.</param>
+		/// <returns>True if focus was set to the UIElement, or focus was already on the UIElement. False if the UIElement is not focusable.</returns>
+		public bool Focus(FocusState value) => FocusImpl(value);
+
+		internal void Unfocus()
+		{
+			var hasFocus = FocusProperties.HasFocusedElement(this);
+			if (hasFocus)
+			{
+				var focusManager = VisualTree.GetFocusManagerForElement(this);
+
+				// Set the focus on the next focusable control.
+				// If we are trying to set focus in a changing focus event handler, we will end up leaving focus on the disabled control.
+				// As a result, we fail fast here. This is being tracked by Bug 9840123
+				focusManager?.ClearFocus();
+			}
+		}
+
 		public GeneralTransform TransformToVisual(UIElement visual)
 			=> new MatrixTransform { Matrix = new Matrix(GetTransform(from: this, to: visual)) };
 
+		protected virtual void OnVisibilityChanged(Visibility oldValue, Visibility newVisibility)
+		{
+			OnVisibilityChangedPartial(oldValue, newVisibility);
+
+			// Part of the logic from MUX uielement.cpp VisibilityState
+			if (newVisibility != Visibility.Visible)
+			{
+				var hasFocus = FocusProperties.HasFocusedElement(this);
+				if (hasFocus)
+				{
+					var focusManager = VisualTree.GetFocusManagerForElement(this);
+
+					// Set the focus on the next focusable control.
+					// If we are trying to set focus in a changing focus event handler, we will end up leaving focus on the disabled control.
+					// As a result, we fail fast here. This is being tracked by Bug 9840123
+					focusManager?.SetFocusOnNextFocusableElement(focusManager.GetRealFocusStateForFocusedElement(), true);
+				}
+			}
+		}
+
+		partial void OnVisibilityChangedPartial(Visibility oldValue, Visibility newValue);
+
+		[NotImplemented]
+		protected virtual AutomationPeer OnCreateAutomationPeer() => new AutomationPeer();
+
+		internal AutomationPeer OnCreateAutomationPeerInternal() => OnCreateAutomationPeer();
+
 		internal static Matrix3x2 GetTransform(UIElement from, UIElement to)
 		{
-			var logInfoString = from.Log().IsEnabled(LogLevel.Information) ? new StringBuilder() : null;
+			var logInfoString = from.Log().IsEnabled(LogLevel.Debug) ? new StringBuilder() : null;
 			logInfoString?.Append($"{nameof(GetTransform)}(from: {from}, to: {to?.ToString() ?? "<null>"}) Offsets: [");
 
 			if (from == to)
@@ -284,30 +345,22 @@ namespace Windows.UI.Xaml
 					offsetY = layoutSlot.Y;
 				}
 
-#if !UNO_HAS_MANAGED_SCROLL_PRESENTER
-				// On Skia, the Scrolling is managed by the ScrollContentPresenter (as UWP), which is flagged as IsScrollPort.
-				// Note: We should still add support for the zoom factor ... which is not yet supported on Skia.
-				if (elt is ScrollViewer sv)
+#if !__MACOS__ // On macOS the SCP is using RenderTransforms for scrolling and zooming which has already been included.
+				if (elt is ScrollViewer sv
+					// Don't adjust for scroll offsets if it's the ScrollViewer itself calling TransformToVisual
+					&& elt != from)
 				{
+					// Scroll offsets are handled at SCP level using the IsScrollPort
+
 					var zoom = sv.ZoomFactor;
 					if (zoom != 1)
 					{
 						matrix *= Matrix3x2.CreateTranslation((float)offsetX, (float)offsetY);
 						matrix *= Matrix3x2.CreateScale(zoom);
-
-						offsetX = -sv.HorizontalOffset;
-						offsetY = -sv.VerticalOffset;
-					}
-					else
-					{
-						offsetX -= sv.HorizontalOffset;
-						offsetY -= sv.VerticalOffset;
 					}
 				}
-				else
-#endif
-#if !__MACOS__ // On macOS the SCP is using RenderTransforms for scrolling which has already been included.
-				if (elt.IsScrollPort) // Custom scroller
+
+				if (elt.IsScrollPort) // Managed SCP or custom scroller
 				{
 					offsetX -= elt.ScrollOffsets.X;
 					offsetY -= elt.ScrollOffsets.Y;
@@ -333,7 +386,7 @@ namespace Windows.UI.Xaml
 			if (logInfoString != null)
 			{
 				logInfoString.Append($"], matrix: {matrix}");
-				from.Log().LogInformation(logInfoString.ToString());
+				from.Log().LogDebug(logInfoString.ToString());
 			}
 			return matrix;
 		}
@@ -435,21 +488,38 @@ namespace Windows.UI.Xaml
 
 			try
 			{
-				_isInUpdateLayout = true;
+				InnerUpdateLayout(root);
+				return;
+			}
+			finally
+			{
+				_isInUpdateLayout = false;
+			}
+		}
 
-				// On UWP, the UpdateLayout method has an overload which accepts the desired size used by the window/app to layout the visual tree,
-				// then this overload without parameter is only using the internally cached last desired size.
-				// With Uno this method is not used for standard layouting passes, so we cannot properly internally cache the value,
-				// and we instead could use the LayoutInformation.GetLayoutSlot(root).
-				//
-				// The issue is that unlike UWP which will ends by requesting an UpdateLayout with the right window bounds,
-				// Uno instead exclusively relies on measure/arrange invalidation.
-				// So if we invoke the `UpdateLayout()` **before** the tree has been measured at least once
-				// (which is the case when using a MUX.NavigationView in the "MainPage" on iOS as OnApplyTemplate is invoked too early),
-				// then the whole tree will be measured at the last known value which is 0x0 and will never be invalidated.
-				//
-				// To avoid this we are instead using the Window Bounds as anyway they are the same as the root's slot.
-				var bounds = Windows.UI.Xaml.Window.Current.Bounds;
+		/// <remarks>
+		/// This method contains or is called by a try/catch containing method and
+		/// can be significantly slower than other methods as a result on WebAssembly.
+		/// See https://github.com/dotnet/runtime/issues/56309
+		/// </remarks>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static void InnerUpdateLayout(UIElement root)
+		{
+			_isInUpdateLayout = true;
+
+			// On UWP, the UpdateLayout method has an overload which accepts the desired size used by the window/app to layout the visual tree,
+			// then this overload without parameter is only using the internally cached last desired size.
+			// With Uno this method is not used for standard layouting passes, so we cannot properly internally cache the value,
+			// and we instead could use the LayoutInformation.GetLayoutSlot(root).
+			//
+			// The issue is that unlike UWP which will ends by requesting an UpdateLayout with the right window bounds,
+			// Uno instead exclusively relies on measure/arrange invalidation.
+			// So if we invoke the `UpdateLayout()` **before** the tree has been measured at least once
+			// (which is the case when using a MUX.NavigationView in the "MainPage" on iOS as OnApplyTemplate is invoked too early),
+			// then the whole tree will be measured at the last known value which is 0x0 and will never be invalidated.
+			//
+			// To avoid this we are instead using the Window Bounds as anyway they are the same as the root's slot.
+			var bounds = Windows.UI.Xaml.Window.Current.Bounds;
 
 #if __MACOS__ || __IOS__ // IsMeasureDirty and IsArrangeDirty are not available on iOS / macOS
 				root.Measure(bounds.Size);
@@ -469,29 +539,24 @@ namespace Windows.UI.Xaml
 					}
 				}
 #else
-				for (var i = 0; i < MaxLayoutIterations; i++)
-				{
-					if (root.IsMeasureDirty)
-					{
-						root.Measure(bounds.Size);
-					}
-					else if (root.IsArrangeDirty)
-					{
-						root.Arrange(bounds);
-					}
-					else
-					{
-						return;
-					}
-				}
-
-				throw new InvalidOperationException("Layout cycle detected.");
-#endif
-			}
-			finally
+			for (var i = 0; i < MaxLayoutIterations; i++)
 			{
-				_isInUpdateLayout = false;
+				if (root.IsMeasureDirty)
+				{
+					root.Measure(bounds.Size);
+				}
+				else if (root.IsArrangeDirty)
+				{
+					root.Arrange(bounds);
+				}
+				else
+				{
+					return;
+				}
 			}
+
+			throw new InvalidOperationException("Layout cycle detected.");
+#endif
 		}
 
 		internal void ApplyClip()
@@ -557,7 +622,7 @@ namespace Windows.UI.Xaml
 
 				if (DependencyProperty.GetProperty(owner.GetType(), dependencyPropertyName) is DependencyProperty dp)
 				{
-					if (owner.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+					if (owner.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 					{
 						owner.Log().LogDebug($"SetDependencyPropertyValue({dependencyPropertyName}) = {value}");
 					}
@@ -568,7 +633,7 @@ namespace Windows.UI.Xaml
 				}
 				else
 				{
-					if (owner.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+					if (owner.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 					{
 						owner.Log().LogDebug($"Failed to find property [{dependencyPropertyName}] on [{owner}]");
 					}
@@ -599,11 +664,21 @@ namespace Windows.UI.Xaml
 		/// Backing property for <see cref="LayoutInformation.GetLayoutSlot(FrameworkElement)"/>
 		/// </summary>
 		Rect IUIElement.LayoutSlot { get; set; }
+
 		/// <summary>
-		/// Gets the 'finalSize' of the last Arrange
+		/// Gets the 'finalSize' of the last Arrange.
+		/// Be aware that it's the rect provided by the parent, **before** margins and alignment are being applied,
+		/// so the size of that rect can be different to the size get in the `ArrangeOverride`.
 		/// </summary>
+		/// <remarks>This is expressed in parent's coordinate space.</remarks>
 		internal Rect LayoutSlot => ((IUIElement)this).LayoutSlot;
 
+		/// <summary>
+		/// This is the <see cref="LayoutSlot"/> **after** margins and alignments has been applied.
+		/// It's somehow the region into which an element renders itself in its parent (before any RenderTransform).
+		/// This is the 'finalRect' of the last Arrange.
+		/// </summary>
+		/// <remarks>This is expressed in parent's coordinate space.</remarks>
 		internal Rect LayoutSlotWithMarginsAndAlignments { get; set; } = default;
 
 		internal bool NeedsClipToSlot { get; set; }
@@ -627,16 +702,16 @@ namespace Windows.UI.Xaml
 		/// </summary>
 		public Size RenderSize { get; internal set; }
 
-		public virtual void Measure(Size availableSize)
-		{
-		}
-
 #if !UNO_REFERENCE_API
 		/// <summary>
 		/// This is the Frame that should be used as "available Size" for the Arrange phase.
 		/// </summary>
 		internal Rect? ClippedFrame;
 #endif
+
+		public virtual void Measure(Size availableSize)
+		{
+		}
 
 		public virtual void Arrange(Rect finalRect)
 		{
@@ -682,7 +757,7 @@ namespace Windows.UI.Xaml
 			{
 				// This currently doesn't support nested scrolling.
 				// This currently doesn't support BringIntoViewOptions.AnimationDesired.
-				var scrollContentPresenter = this.FindFirstParent<IScrollContentPresenter>();
+				var scrollContentPresenter = this.FindFirstParent<ScrollContentPresenter>();
 				scrollContentPresenter?.MakeVisible(this, options.TargetRect ?? Rect.Empty);
 			});
 #endif
@@ -808,48 +883,68 @@ namespace Windows.UI.Xaml
 			return Math.Round(x);
 		}
 
+		public XYFocusKeyboardNavigationMode XYFocusKeyboardNavigation
+		{
+			get => GetXYFocusKeyboardNavigationValue();
+			set => SetXYFocusKeyboardNavigationValue(value);
+		}
+
+		[GeneratedDependencyProperty(DefaultValue = default(XYFocusKeyboardNavigationMode), Options = FrameworkPropertyMetadataOptions.Inherits)]
+		public static DependencyProperty XYFocusKeyboardNavigationProperty { get; } = CreateXYFocusKeyboardNavigationProperty();
+
+		public XYFocusNavigationStrategy XYFocusDownNavigationStrategy
+		{
+			get => GetXYFocusDownNavigationStrategyValue();
+			set => SetXYFocusDownNavigationStrategyValue(value);
+		}
+
+		[GeneratedDependencyProperty(DefaultValue = default(XYFocusNavigationStrategy))]
+		public static DependencyProperty XYFocusDownNavigationStrategyProperty { get; } = CreateXYFocusDownNavigationStrategyProperty();
+
+		public XYFocusNavigationStrategy XYFocusLeftNavigationStrategy
+		{
+			get => GetXYFocusLeftNavigationStrategyValue();
+			set => SetXYFocusLeftNavigationStrategyValue(value);
+		}
+
+		[GeneratedDependencyProperty(DefaultValue = default(XYFocusNavigationStrategy))]
+		public static DependencyProperty XYFocusLeftNavigationStrategyProperty { get; } = CreateXYFocusLeftNavigationStrategyProperty();
+
+		public XYFocusNavigationStrategy XYFocusRightNavigationStrategy
+		{
+			get => GetXYFocusRightNavigationStrategyValue();
+			set => SetXYFocusRightNavigationStrategyValue(value);
+		}
+
+		[GeneratedDependencyProperty(DefaultValue = default(XYFocusNavigationStrategy))]
+		public static DependencyProperty XYFocusRightNavigationStrategyProperty { get; } = CreateXYFocusRightNavigationStrategyProperty();
+
+		public XYFocusNavigationStrategy XYFocusUpNavigationStrategy
+		{
+			get => GetXYFocusUpNavigationStrategyValue();
+			set => SetXYFocusUpNavigationStrategyValue(value);
+		}
+
+		[GeneratedDependencyProperty(DefaultValue = default(XYFocusNavigationStrategy))]
+		public static DependencyProperty XYFocusUpNavigationStrategyProperty { get; } = CreateXYFocusUpNavigationStrategyProperty();
+
+		public KeyboardNavigationMode TabFocusNavigation
+		{
+			get => GetTabFocusNavigationValue();
+			set => SetTabFocusNavigationValue(value);
+		}
+
+		[GeneratedDependencyProperty(DefaultValue = default(KeyboardNavigationMode))]
+		public static DependencyProperty TabFocusNavigationProperty { get; } = CreateTabFocusNavigationProperty();
+
 #if HAS_UNO_WINUI
-#region FocusState DependencyProperty
-
-		public FocusState FocusState
+		// Skipping already declared property ActualSize
+		[global::Uno.NotImplemented("__ANDROID__", "__IOS__", "NET461", "__WASM__", "__SKIA__", "__NETSTD_REFERENCE__", "__MACOS__")]
+		public UI.Input.InputCursor ProtectedCursor
 		{
-			get { return (FocusState)GetValue(FocusStateProperty); }
-			internal set { SetValue(FocusStateProperty, value); }
+			get;
+			set;
 		}
-
-		public static DependencyProperty FocusStateProperty { get; } =
-			DependencyProperty.Register(
-				"FocusState",
-				typeof(FocusState),
-				typeof(UIElement),
-				new FrameworkPropertyMetadata(
-					(FocusState)FocusState.Unfocused
-				)
-			);
-
-#endregion
-
-#region IsTabStop DependencyProperty
-
-		public bool IsTabStop
-		{
-			get { return (bool)GetValue(IsTabStopProperty); }
-			set { SetValue(IsTabStopProperty, value); }
-		}
-
-		public static DependencyProperty IsTabStopProperty { get; } =
-			DependencyProperty.Register(
-				"IsTabStop",
-				typeof(bool),
-				typeof(UIElement),
-				new FrameworkPropertyMetadata(
-					(bool)true,
-					(s, e) => ((Control)s)?.OnIsTabStopChanged((bool)e.OldValue, (bool)e.NewValue)
-				)
-			);
-#endregion
-
-		private protected virtual void OnIsTabStopChanged(bool oldValue, bool newValue) { }
 #endif
 	}
 }

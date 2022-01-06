@@ -523,6 +523,35 @@ namespace SamplesApp.UITests.Windows_UI_Xaml_Controls.TextBlockTests
 			const float precision = 20f; // On iOS he result is 148 and MacOS it's 146
 			textBlockHeight.Should().BeApproximately(expectedHeight, precision);
 			textBoxHeight.Should().BeApproximately(expectedHeight, precision);
+
+		[Test]
+		[AutoRetry]
+    [ActivePlatforms(Platform.Browser)]
+		public void When_Text_Selection_Is_Enabled()
+		{
+			Run("UITests.Windows_UI_Xaml_Controls.TextBlockControl.TextBlock_IsTextSelectionEnabled");
+
+			var nonSelectableTextBlock = _app.WaitForElement("NonSelectableUnderscoreTextBlock").Single().Rect;
+			var selectableTextBlock = _app.WaitForElement("SelectableUnderscoreTextBlock").Single().Rect;
+
+			// Attempt selection
+			_app.DoubleTapCoordinates(nonSelectableTextBlock.CenterX, nonSelectableTextBlock.CenterY);
+
+			using (var nonSelectableScreenshot = TakeScreenshot("NonSelectableTextBlock", ignoreInSnapshotCompare: true))
+			{
+				ImageAssert.HasColorAt(nonSelectableScreenshot, nonSelectableTextBlock.CenterX, nonSelectableTextBlock.CenterY, Color.White);
+			}
+
+			// Click to ensure any selection is removed
+			_app.TapCoordinates(nonSelectableTextBlock.CenterX, nonSelectableTextBlock.CenterY);
+
+			// Attempt selection
+			_app.DoubleTapCoordinates(selectableTextBlock.CenterX, selectableTextBlock.CenterY);
+
+			using (var selectableScreenshot = TakeScreenshot("SelectableTextBlock", ignoreInSnapshotCompare: true))
+			{
+				ImageAssert.DoesNotHaveColorAt(selectableScreenshot, selectableTextBlock.CenterX, selectableTextBlock.CenterY, Color.White);
+			}
 		}
 	}
 }

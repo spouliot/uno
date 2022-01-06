@@ -12,7 +12,7 @@ using Windows.UI.Core;
 using Uno;
 using Uno.Extensions;
 using Uno.Extensions.Specialized;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI;
 using Uno.UI.Extensions;
 
@@ -329,7 +329,7 @@ namespace Windows.UI.Xaml.Controls.Primitives
 		private class CacheEntryComparer : IComparer<CacheEntry>
 		{
 			public static CacheEntryComparer Instance { get; } = new CacheEntryComparer();
-			public int Compare(CacheEntry x, CacheEntry y) => x.Index.CompareTo(y.Index);
+			public int Compare(CacheEntry? x, CacheEntry? y) => x != null && y != null ? x.Index.CompareTo(y.Index) : -1;
 		}
 
 		private enum CacheEntryKind
@@ -393,14 +393,43 @@ namespace Windows.UI.Xaml.Controls.Primitives
 
 		internal void ScrollItemIntoView(int index, ScrollIntoViewAlignment alignment, double offset, bool forceSynchronous)
 		{
-			if (_layoutStrategy is null)
+			if (_layoutStrategy is null || Owner is null)
 			{
 				return;
 			}
 
+			if (!m_isBiggestItemSizeDetermined)
+			{
+				// On Android we might not have been measured before requesting a ScrollInto (Picker),
+				// so the itemSize will be the default 1x1 which would drive to invalid scroll offsets.
+				// In that case we forcefully DetermineTheBiggestItemSize and ForceConfigViewport to make sure that
+				// the bounds provided by the EstimateElementBounds are valid.
+
+				var pseudoAvailableSize = GetLayoutViewport().Size;
+
+				// The code below replicates what's done by the MeasureOverride
+				DetermineTheBiggestItemSize(Owner, pseudoAvailableSize, out var biggestItemSize);
+				if (biggestItemSize != m_biggestItemSize)
+				{
+					m_biggestItemSize = biggestItemSize;
+
+					// for primary panel, we should notify the CalendarView, so CalendarView can update
+					// the size for other template parts.
+					if (m_type == CalendarPanelType.Primary)
+					{
+						SetItemMinimumSize(biggestItemSize);
+						Owner.OnPrimaryPanelDesiredSizeChanged();
+					}
+				}
+				m_isBiggestItemSizeDetermined = true;
+
+				// Then we make sure to configure Cols and Rows
+				ForceConfigViewport(pseudoAvailableSize);
+			}
+
 			_layoutStrategy.EstimateElementBounds(ElementType.ItemContainer, index, default, default, default, out var bounds);
 
-			if (Owner?.ScrollViewer is { } sv)
+			if (Owner.ScrollViewer is { } sv)
 			{
 				var newOffset = bounds.Y + offset;
 				var currentOffset = sv.VerticalOffset;
@@ -488,11 +517,11 @@ namespace Windows.UI.Xaml.Controls.Primitives
 			var viewport = new Rect(
 				_effectiveViewport.Location.FiniteOrDefault(default),
 				_effectiveViewport.Size.AtLeast(availableSize).AtLeast(_defaultHardCodedSize).FiniteOrDefault(_defaultHardCodedSize));
-			if (calendar.HorizontalAlignment != HorizontalAlignment.Stretch)
+			if (calendar.HorizontalAlignment != HorizontalAlignment.Stretch && double.IsNaN(calendar.Width) && calendar.MinWidth <= 0)
 			{
 				viewport.Width = _defaultHardCodedSize.Width;
 			}
-			if (calendar.VerticalAlignment != VerticalAlignment.Stretch)
+			if (calendar.VerticalAlignment != VerticalAlignment.Stretch && double.IsNaN(calendar.Height) && calendar.MinHeight <= 0)
 			{
 				viewport.Height = _defaultHardCodedSize.Height;
 			}
@@ -735,7 +764,7 @@ namespace Windows.UI.Xaml.Controls.Primitives
 			// which is actually set **ONLY** by this SetViewport for Year and Decade host
 			// (We bypass the SetItemMinimumSize in the CalendarPanel_Partial.MeasureOverride if m_type is **not** CalendarPanelType.Primary)
 
-			if (m_type == CalendarPanelType.Secondary_SelfAdaptive && m_biggestItemSize.Width > 2 && m_biggestItemSize.Height > 2)
+			if (m_isBiggestItemSizeDetermined && m_type == CalendarPanelType.Secondary_SelfAdaptive)
 			{
 				int effectiveCols = (int)(viewportSize.Width / m_biggestItemSize.Width);
 				int effectiveRows = (int)(viewportSize.Height / m_biggestItemSize.Height);

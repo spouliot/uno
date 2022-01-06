@@ -1,6 +1,6 @@
 ﻿#if !UNO_HAS_MANAGED_SCROLL_PRESENTER
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI.DataBinding;
 using Windows.UI.Xaml.Data;
 using System;
@@ -9,25 +9,34 @@ using System.Collections.Generic;
 using Uno.Disposables;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Drawing;
+using Windows.Foundation;
 
 #if XAMARIN_ANDROID
 using View = Android.Views.View;
 #elif XAMARIN_IOS_UNIFIED
 using UIKit;
 using View = UIKit.UIView;
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+#endif
 #elif __MACOS__
 using AppKit;
 using View = AppKit.NSView;
 #else
 using View = Windows.UI.Xaml.UIElement;
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+#endif
 #endif
 
 namespace Windows.UI.Xaml.Controls
 {
-	internal partial class NativeScrollContentPresenter : IScrollContentPresenter
+	internal partial class NativeScrollContentPresenter : IScrollContentPresenter, INativeScrollContentPresenter
 	{
 		private View _content;
+
+		ScrollBarVisibility IScrollContentPresenter.NativeHorizontalScrollBarVisibility { set => HorizontalScrollBarVisibility = value; }
+		ScrollBarVisibility IScrollContentPresenter.NativeVerticalScrollBarVisibility { set => VerticalScrollBarVisibility = value; }
 
 		public bool CanHorizontallyScroll
 		{
@@ -43,7 +52,7 @@ namespace Windows.UI.Xaml.Controls
 
 		public object Content
 		{
-			get { return _content; }
+			get => _content;
 			set
 			{
 				var previousView = _content;
@@ -52,6 +61,8 @@ namespace Windows.UI.Xaml.Controls
 				OnContentChanged(previousView, value as View);
 			}
 		}
+
+		public Size? CustomContentExtent => null;
 
 		partial void OnContentChanged(View previousView, View newView);
 

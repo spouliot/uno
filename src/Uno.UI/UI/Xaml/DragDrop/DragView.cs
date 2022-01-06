@@ -16,7 +16,7 @@ namespace Windows.UI.Xaml
 	{
 		#region Glyph
 		public static readonly DependencyProperty GlyphProperty = DependencyProperty.Register(
-			"Glyph", typeof(string), typeof(DragView), new PropertyMetadata(default(string)));
+			"Glyph", typeof(string), typeof(DragView), new FrameworkPropertyMetadata(default(string)));
 
 		public string Glyph
 		{
@@ -27,7 +27,7 @@ namespace Windows.UI.Xaml
 
 		#region GlyphVisibility
 		public static readonly DependencyProperty GlyphVisibilityProperty = DependencyProperty.Register(
-			"GlyphVisibility", typeof(Visibility), typeof(DragView), new PropertyMetadata(default(Visibility)));
+			"GlyphVisibility", typeof(Visibility), typeof(DragView), new FrameworkPropertyMetadata(default(Visibility)));
 
 		public Visibility GlyphVisibility
 		{
@@ -38,7 +38,7 @@ namespace Windows.UI.Xaml
 
 		#region Caption
 		public static readonly DependencyProperty CaptionProperty = DependencyProperty.Register(
-			"Caption", typeof(string), typeof(DragView), new PropertyMetadata(default(string)));
+			"Caption", typeof(string), typeof(DragView), new FrameworkPropertyMetadata(default(string)));
 
 		public string Caption
 		{
@@ -49,7 +49,7 @@ namespace Windows.UI.Xaml
 
 		#region CaptionVisibility
 		public static readonly DependencyProperty CaptionVisibilityProperty = DependencyProperty.Register(
-			"CaptionVisibility", typeof(Visibility), typeof(DragView), new PropertyMetadata(default(Visibility)));
+			"CaptionVisibility", typeof(Visibility), typeof(DragView), new FrameworkPropertyMetadata(default(Visibility)));
 
 		public Visibility CaptionVisibility
 		{
@@ -60,7 +60,7 @@ namespace Windows.UI.Xaml
 
 		#region Content
 		public static readonly DependencyProperty ContentProperty = DependencyProperty.Register(
-			"Content", typeof(ImageSource), typeof(DragView), new PropertyMetadata(default(ImageSource)));
+			"Content", typeof(ImageSource), typeof(DragView), new FrameworkPropertyMetadata(default(ImageSource)));
 
 		public ImageSource? Content
 		{
@@ -69,9 +69,20 @@ namespace Windows.UI.Xaml
 		}
 		#endregion
 
+		#region ContentAnchor
+		public static readonly DependencyProperty ContentAnchorProperty = DependencyProperty.Register(
+			"ContentAnchor", typeof(Point), typeof(DragView), new FrameworkPropertyMetadata(default(Point)));
+
+		public Point ContentAnchor
+		{
+			get => (Point)GetValue(ContentAnchorProperty);
+			private set => SetValue(ContentAnchorProperty, value);
+		}
+		#endregion
+
 		#region ContentVisibility
 		public static readonly DependencyProperty ContentVisibilityProperty = DependencyProperty.Register(
-			"ContentVisibility", typeof(Visibility), typeof(DragView), new PropertyMetadata(default(Visibility)));
+			"ContentVisibility", typeof(Visibility), typeof(DragView), new FrameworkPropertyMetadata(default(Visibility)));
 
 		public Visibility ContentVisibility
 		{
@@ -82,7 +93,7 @@ namespace Windows.UI.Xaml
 
 		#region TooltipVisibility
 		public static readonly DependencyProperty TooltipVisibilityProperty = DependencyProperty.Register(
-			"TooltipVisibility", typeof(Visibility), typeof(DragView), new PropertyMetadata(default(Visibility)));
+			"TooltipVisibility", typeof(Visibility), typeof(DragView), new FrameworkPropertyMetadata(default(Visibility)));
 
 		public Visibility TooltipVisibility
 		{
@@ -110,8 +121,8 @@ namespace Windows.UI.Xaml
 			// TODO: Make sure to not move the element out of the bounds of the window
 			_location = location;
 
-			_transform.X = location.X - (ActualWidth / 2);
-			_transform.Y = location.Y - 40; // The caption is above the pointer
+			_transform.X = location.X;
+			_transform.Y = location.Y;
 		}
 
 		public void Update(DataPackageOperation acceptedOperation, CoreDragUIOverride viewOverride)
@@ -132,7 +143,16 @@ namespace Windows.UI.Xaml
 			GlyphVisibility = ToVisibility(viewOverride.IsGlyphVisible);
 			Caption = caption!;
 			CaptionVisibility = ToVisibility(viewOverride.IsCaptionVisible && !string.IsNullOrWhiteSpace(caption));
-			Content = viewOverride.Content as ImageSource ?? _ui?.Content;
+			if (viewOverride.Content is ImageSource overriddenContent)
+			{
+				Content = overriddenContent;
+				ContentAnchor = viewOverride.ContentAnchor;
+			}
+			else
+			{
+				Content = _ui?.Content;
+				ContentAnchor = _ui?.Anchor ?? default;
+			}
 			ContentVisibility = ToVisibility(viewOverride.IsContentVisible);
 			TooltipVisibility = ToVisibility(viewOverride.IsGlyphVisible || viewOverride.IsCaptionVisible);
 			Visibility = Visibility.Visible;

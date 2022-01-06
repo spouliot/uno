@@ -9,11 +9,17 @@ using Uno;
 using Uno.UI.Xaml.Input;
 using Windows.System;
 using Windows.UI.Core;
+
+#if HAS_UNO_WINUI
+using Microsoft.UI.Input;
+#else
+using Windows.Devices.Input;
 using Windows.UI.Input;
+#endif
 
 namespace Windows.UI.Xaml.Input
 {
-	public sealed partial class PointerRoutedEventArgs : RoutedEventArgs, ICancellableRoutedEventArgs, CoreWindow.IPointerEventArgs, IDragEventSource
+	public sealed partial class PointerRoutedEventArgs : RoutedEventArgs, IHandleableRoutedEventArgs, CoreWindow.IPointerEventArgs, IDragEventSource
 	{
 #if UNO_HAS_MANAGED_POINTERS
 		internal const bool PlatformSupportsNativeBubbling = false;
@@ -30,8 +36,8 @@ namespace Windows.UI.Xaml.Input
 		}
 
 		/// <inheritdoc />
-		PointerPoint CoreWindow.IPointerEventArgs.GetLocation(object relativeTo)
-			=> GetCurrentPoint(relativeTo as UIElement);
+		Windows.UI.Input.PointerPoint CoreWindow.IPointerEventArgs.GetLocation(object relativeTo)
+			=> (Windows.UI.Input.PointerPoint)GetCurrentPoint(relativeTo as UIElement);
 
 		public IList<PointerPoint> GetIntermediatePoints(UIElement relativeTo)
 			=> new List<PointerPoint>(1) {GetCurrentPoint(relativeTo)};
@@ -51,6 +57,8 @@ namespace Windows.UI.Xaml.Input
 		/// <inheritdoc />
 		public override string ToString()
 			=> $"PointerRoutedEventArgs({Pointer}@{GetCurrentPoint(null).Position})";
+
+		Windows.Devices.Input.PointerIdentifier CoreWindow.IPointerEventArgs.Pointer => Pointer.UniqueId;
 
 		long IDragEventSource.Id => Pointer.UniqueId;
 		uint IDragEventSource.FrameId => FrameId;

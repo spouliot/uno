@@ -12,7 +12,7 @@ using Windows.UI.Xaml.Controls;
 namespace UITests.Windows_Storage.Pickers
 {
 	[Sample("Windows.Storage", ViewModelType = typeof(FolderPickerTestsViewModel), IsManualTest = true,
-		Description = "Allows testing all features of FolderPicker. Currently not supported on Android, iOS, macOS and GTK. Not selecting a folder should not cause an exception")]
+		Description = "Allows testing all features of FolderPicker. Currently not supported on Android, iOS, and macOS. Not selecting a folder should not cause an exception")]
 	public sealed partial class FolderPickerTests : Page
 	{
 		public FolderPickerTests()
@@ -26,10 +26,10 @@ namespace UITests.Windows_Storage.Pickers
 			ViewModel = args.NewValue as FolderPickerTestsViewModel;
 		}
 
-		public FolderPickerTestsViewModel ViewModel { get; private set; }
+		internal FolderPickerTestsViewModel ViewModel { get; private set; }
 	}
 
-	public class FolderPickerTestsViewModel : ViewModelBase
+	internal class FolderPickerTestsViewModel : ViewModelBase
 	{
 		private string _fileType = string.Empty;
 		private string _errorMessage = string.Empty;

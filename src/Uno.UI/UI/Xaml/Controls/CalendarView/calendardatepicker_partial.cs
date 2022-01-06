@@ -4,17 +4,22 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Windows.Devices.Input;
 using Windows.Foundation;
 using Windows.Globalization.DateTimeFormatting;
 using Windows.System;
-using Windows.UI.Input;
 using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Media;
 using DirectUI;
 using DateTime = System.DateTimeOffset;
 using Windows.UI.Xaml.Input;
+
+#if HAS_UNO_WINUI
+using Microsoft.UI.Input;
+#else
+using Windows.Devices.Input;
+using Windows.UI.Input;
+#endif
 
 namespace Windows.UI.Xaml.Controls
 {
@@ -85,7 +90,7 @@ namespace Windows.UI.Xaml.Controls
 			// Set a default string as the PlaceholderText property value.
 			string strDefaultPlaceholderText;
 
-			strDefaultPlaceholderText = DXamlCore.GetCurrent().GetLocalizedResourceString(TEXT_CALENDARDATEPICKER_DEFAULT_PLACEHOLDER_TEXT);
+			strDefaultPlaceholderText = DXamlCore.Current.GetLocalizedResourceString(TEXT_CALENDARDATEPICKER_DEFAULT_PLACEHOLDER_TEXT);
 
 			PlaceholderText = strDefaultPlaceholderText;
 
@@ -274,13 +279,16 @@ namespace Windows.UI.Xaml.Controls
 
 			UpdateVisualState();
 
-			void OnFlyoutOpened(object sender, EventArgs eventArgs)
+			// TODO: Uno specific: This logic should later move to Control to match WinUI
+			UpdateDescriptionVisibility(true);
+
+			void OnFlyoutOpened(object sender, object eventArgs)
 			{
 				IsCalendarOpen = true;
 				_opened?.Invoke(this, new object());
 			}
 
-			void OnFlyoutClosed(object sender, EventArgs eventArgs)
+			void OnFlyoutClosed(object sender, object eventArgs)
 			{
 				IsCalendarOpen = false;
 				_closed?.Invoke(this, new object());
@@ -897,7 +905,7 @@ namespace Windows.UI.Xaml.Controls
 		{
 			Pointer spPointer;
 			PointerPoint spPointerPoint;
-			PointerDevice spPointerDevice;
+			Windows.Devices.Input.PointerDevice spPointerDevice;
 			PointerDeviceType nPointerDeviceType = PointerDeviceType.Touch;
 
 			//CalendarDatePickerGenerated.OnPointerCaptureLost(pArgs);
@@ -916,7 +924,7 @@ namespace Windows.UI.Xaml.Controls
 
 			// IFCPTR_RETURN(spPointerDevice);
 
-			nPointerDeviceType = spPointerDevice.PointerDeviceType;
+			nPointerDeviceType = (PointerDeviceType)spPointerDevice.PointerDeviceType;
 			if (nPointerDeviceType == PointerDeviceType.Touch)
 			{
 				m_isPointerOverMain = false;
@@ -941,7 +949,7 @@ namespace Windows.UI.Xaml.Controls
 				m_shouldPerformActions = false;
 				IsCalendarOpen = true;
 
-				ElementSoundPlayerService soundPlayerService = DXamlCore.GetCurrent().GetElementSoundPlayerServiceNoRef();
+				var soundPlayerService = DXamlCore.Current.GetElementSoundPlayerServiceNoRef();
 				soundPlayerService.RequestInteractionSoundForElement(ElementSoundKind.Invoke, this);
 			}
 		}
@@ -1098,6 +1106,21 @@ namespace Windows.UI.Xaml.Controls
 			if (m_tpDateText is {})
 			{
 				value = m_tpDateText.Text;
+			}
+		}
+
+		private void UpdateDescriptionVisibility(bool initialization)
+		{
+			if (initialization && Description == null)
+			{
+				// Avoid loading DescriptionPresenter element in template if not needed.
+				return;
+			}
+
+			var descriptionPresenter = this.FindName("DescriptionPresenter") as ContentPresenter;
+			if (descriptionPresenter != null)
+			{
+				descriptionPresenter.Visibility = Description != null ? Visibility.Visible : Visibility.Collapsed;
 			}
 		}
 	}

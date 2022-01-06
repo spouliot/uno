@@ -13,18 +13,28 @@ namespace Windows.UI.Xaml.Controls
 	/// </summary>
 	internal partial interface IScrollContentPresenter
 	{
-		ScrollBarVisibility HorizontalScrollBarVisibility { get; set; }
-		ScrollBarVisibility VerticalScrollBarVisibility { get; set; }
+		// NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+		//
+		// This interface is obsolete and should not used anymore.
+		// The logic is being move into the SCP which then re-routes to the INativeScrollContentPresenter
+		// 
+		// NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE 
+
+		ScrollBarVisibility NativeHorizontalScrollBarVisibility { set; }
+		ScrollBarVisibility NativeVerticalScrollBarVisibility { set; }
 
 		bool CanHorizontallyScroll { get; set; }
 		bool CanVerticallyScroll { get; set; }
+
+		/// <summary>
+		/// The absolute dimensions of the content (or an estimate), for presenters where this is not simply equal to the Content element's size.
+		/// </summary>
+		Size? CustomContentExtent { get; }
 
 		object Content { get; set; }
 
 		void OnMinZoomFactorChanged(float newValue);
 		void OnMaxZoomFactorChanged(float newValue);
-
-		Rect MakeVisible(UIElement visual, Rect rectangle);
 	}
 }
 #endif

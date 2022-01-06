@@ -1,22 +1,34 @@
-﻿#if __IOS__ || __MACOS__ || __SKIA__ || __ANDROID__
+﻿#nullable enable
+
+#if __IOS__ || __MACOS__ || __SKIA__ || __ANDROID__
 using System;
 using System.Linq;
 using Windows.Foundation;
 using Windows.UI.Xaml.Media;
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI;
 using static System.Double;
 
 #if __IOS__
 using _Color = UIKit.UIColor;
 using NativePath = CoreGraphics.CGPath;
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+using NativeSingle = ObjCRuntime.nfloat;
+#else
 using NativeSingle = System.nfloat;
+#endif
 #elif __MACOS__
 using AppKit;
 using _Color = AppKit.NSColor;
 using NativePath = CoreGraphics.CGPath;
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+using NativeSingle = ObjCRuntime.nfloat;
+#else
 using NativeSingle = System.nfloat;
+#endif
 #elif __SKIA__
 using _Color = Windows.UI.Color;
 using NativePath = Windows.UI.Composition.SkiaGeometrySource2D;
@@ -215,9 +227,9 @@ namespace Windows.UI.Xaml.Shapes
 		private Size _realDesiredSize;
 #endif
 
-		private protected Size MeasureAbsoluteShape(Size availableSize, NativePath path)
+		private protected Size MeasureAbsoluteShape(Size availableSize, NativePath? path)
 		{
-			if (path == null)
+			if (path! == null!)
 			{
 				return default;
 			}
@@ -231,7 +243,7 @@ namespace Windows.UI.Xaml.Shapes
 
 			if (NativeSingle.IsInfinity(pathBounds.Right) || NativeSingle.IsInfinity(pathBounds.Bottom))
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"Ignoring path with invalid bounds {pathBounds}");
 				}
@@ -328,9 +340,9 @@ namespace Windows.UI.Xaml.Shapes
 			return size;
 		}
 
-		private protected Size ArrangeAbsoluteShape(Size finalSize, NativePath path)
+		private protected Size ArrangeAbsoluteShape(Size finalSize, NativePath? path, FillRule fillRule = FillRule.EvenOdd)
 		{
-			if (path == null)
+			if (path! == null!)
 			{
 				Render(null);
 				return default;
@@ -347,7 +359,7 @@ namespace Windows.UI.Xaml.Shapes
 
 			if (NativeSingle.IsInfinity(pathBounds.Right) || NativeSingle.IsInfinity(pathBounds.Bottom))
 			{
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"Ignoring path with invalid bounds {pathBounds}");
 				}
@@ -536,7 +548,7 @@ namespace Windows.UI.Xaml.Shapes
 
 			var renderPath = new CoreGraphics.CGPath(path, renderTransform);
 
-			Render(renderPath);
+			Render(renderPath, fillRule);
 #if __IOS__
 			// If the Shape does not have size defined, and natural size of the geometry is lower than the finalSize,
 			// then we don't clip the shape!

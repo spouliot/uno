@@ -36,6 +36,21 @@ namespace Windows.UI.Xaml.Controls
 		}
 		private DatePickerSelector _selector;
 
+		public static DependencyProperty UseNativeMinMaxDatesProperty { get; } = DependencyProperty.Register(
+			"UseNativeMinMaxDates",
+			typeof(bool),
+			typeof(NativeDatePickerFlyout),
+			new FrameworkPropertyMetadata(false));
+
+		/// <summary>
+		/// Setting this to true will interpret MinYear/MaxYear as MinDate and MaxDate.
+		/// </summary>
+		public bool UseNativeMinMaxDates
+		{
+			get => (bool)GetValue(UseNativeMinMaxDatesProperty);
+			set => SetValue(UseNativeMinMaxDatesProperty, value);
+		}
+
 		public NativeDatePickerFlyout()
 		{
 			Opening += DatePickerFlyout_Opening;
@@ -72,12 +87,9 @@ namespace Windows.UI.Xaml.Controls
 
 			_isInitialized = true;
 
-			Content = _selector = new DatePickerSelector()
-			{
-				MinYear = MinYear,
-				MaxYear = MaxYear
-			};
+			Content = _selector = new DatePickerSelector();
 
+			BindToContent("UseNativeMinMaxDates");
 			BindToContent("MinYear");
 			BindToContent("MaxYear");
 		}
@@ -126,7 +138,7 @@ namespace Windows.UI.Xaml.Controls
 		}
 		#endregion
 
-		private void DatePickerFlyout_Opening(object sender, EventArgs e)
+		private void DatePickerFlyout_Opening(object sender, object e)
 		{
 			InitializeContent();
 			var date = Date;
@@ -146,7 +158,7 @@ namespace Windows.UI.Xaml.Controls
 			UpdateSelectorDate(date);
 		}
 
-		private void DatePickerFlyout_Closed(object sender, EventArgs e)
+		private void DatePickerFlyout_Closed(object sender, object e)
 		{
 			_selector.Cancel();
 		}
@@ -237,7 +249,7 @@ namespace Windows.UI.Xaml.Controls
 
 		private void BindToContent(string propertyName)
 		{
-			this.Binding(propertyName, propertyName, Content, BindingMode.TwoWay);
+			Content.Binding(propertyName, propertyName, this, BindingMode.OneWay);
 		}
 	}
 }

@@ -11,6 +11,9 @@ using Foundation;
 using UIKit;
 using CoreGraphics;
 using Path = UIKit.UIBezierPath;
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+#endif
 #elif __MACOS__
 using AppKit;
 using CoreGraphics;
@@ -18,6 +21,9 @@ using UIImage = AppKit.NSImage;
 using UIColor = AppKit.NSColor;
 using UIGraphics = AppKit.NSGraphics;
 using Path = AppKit.NSBezierPath;
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+#endif
 #elif XAMARIN_ANDROID
 using Android.Graphics;
 #elif __SKIA__
@@ -51,7 +57,6 @@ namespace Uno.Media
 			return bezierPath;
 		}
 #endif
-
 
 #if XAMARIN_IOS_UNIFIED || XAMARIN_IOS || __MACOS__
 		public override UIImage ToNativeImage ()

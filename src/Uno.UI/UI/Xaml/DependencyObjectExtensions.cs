@@ -6,7 +6,7 @@ using Uno.Disposables;
 using System.Text;
 using System.Runtime.CompilerServices;
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.Diagnostics.Eventing;
 using Uno.UI.DataBinding;
 
@@ -452,5 +452,10 @@ namespace Windows.UI.Xaml
 		/// </summary>
 		internal static void RegisterPropertyChangedCallbackStrong(this IDependencyObjectStoreProvider storeProvider, ExplicitPropertyChangedCallback handler)
 			=> storeProvider.Store.RegisterPropertyChangedCallbackStrong(handler);
+
+		// TODO Uno: MUX uses a IsRightToLeft virtual method on DependencyObject. This
+		// allows for some customization - e.g. glyphs should not respect this.
+		internal static bool IsRightToLeft(this DependencyObject dependencyObject) =>
+			dependencyObject is FrameworkElement fw && fw.FlowDirection == FlowDirection.RightToLeft;
 	}
 }

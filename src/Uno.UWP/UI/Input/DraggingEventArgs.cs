@@ -1,32 +1,29 @@
 using Windows.Devices.Input;
 using Windows.Foundation;
 
+#if HAS_UNO_WINUI && IS_UNO_UI_PROJECT
+namespace Microsoft.UI.Input
+#else
 namespace Windows.UI.Input
+#endif
 {
-	public  partial class DraggingEventArgs 
+	public partial class DraggingEventArgs 
 	{
-		internal DraggingEventArgs(PointerPoint point, DraggingState state)
+		internal DraggingEventArgs(PointerPoint point, DraggingState state, uint contactCount)
 		{
 			Pointer = point;
 			DraggingState = state;
+			ContactCount = contactCount;
 		}
 
 		internal PointerPoint Pointer { get; }
 
 		public DraggingState DraggingState { get; }
 
-		public PointerDeviceType PointerDeviceType => Pointer.PointerDevice.PointerDeviceType;
+		public PointerDeviceType PointerDeviceType => (PointerDeviceType)Pointer.PointerDevice.PointerDeviceType;
 
 		public Point Position => Pointer.Position;
 
-		[global::Uno.NotImplemented]
-		public uint ContactCount
-		{
-			get
-			{
-				global::Windows.Foundation.Metadata.ApiInformation.TryRaiseNotImplemented("Windows.UI.Input.DraggingEventArgs", "uint DraggingEventArgs.ContactCount");
-				return 0;
-			}
-		}
+		public uint ContactCount { get; }
 	}
 }

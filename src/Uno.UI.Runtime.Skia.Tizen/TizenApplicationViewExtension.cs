@@ -1,7 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
-using Uno.Extensions;
-using Windows.UI.ViewManagement;
+﻿using Windows.UI.ViewManagement;
 using TizenWindow = ElmSharp.Window;
+using Uno.Foundation.Logging;
 
 namespace Uno.UI.Runtime.Skia
 {
@@ -39,6 +38,23 @@ namespace Uno.UI.Runtime.Skia
 				this.Log().LogWarning("FullScreen mode is not yet supported on Tizen.");
 			}
 			return false;
+		}
+
+		public bool TryResizeView(Windows.Foundation.Size size)
+		{
+			if (this.Log().IsEnabled(LogLevel.Warning))
+			{
+				this.Log().LogWarning("Resizing windows is not yet supported on Tizen.");
+			}
+			return false;
+		}
+
+		public void SetPreferredMinSize(Windows.Foundation.Size minSize)
+		{
+			if (this.Log().IsEnabled(LogLevel.Warning))
+			{
+				this.Log().LogWarning("Setting min size of windows is not yet supported on Tizen.");
+			}
 		}
 	}
 }

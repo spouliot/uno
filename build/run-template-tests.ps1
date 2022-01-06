@@ -24,7 +24,7 @@ function Get-TemplateConfiguration(
     $iOSFlag = '-ios'
     $macOSFlag = '-macos'
     $wasmFlag = '-wasm'
-    $wasmVsCodeFlag = '--vscodeWasm'
+    $wasmVsCodeFlag = '--vscode'
     $skiaWpfFlag = '--skia-wpf'
     $skiaGtkFlag = '--skia-gtk'
     $skiaTizenFlag = '--skia-tizen'
@@ -47,7 +47,7 @@ $default = @('/ds', '/r', "/p:RestoreConfigFile=$env:NUGET_CI_CONFIG", '/p:Packa
 
 $debug = $default + '/p:Configuration=Debug'
 
-$release = $default + '/p:AotAssemblies=false' + '/p:Configuration=Release'
+$release = $default + '/p:AotAssemblies=false' + '/p:UseDotNetNativeToolchain=false' + '/p:Configuration=Release'
 $releaseX64 = $release + '/p:Platform=x64'
 $releaseIPhone = $release + '/p:Platform=iPhone'
 $releaseIPhoneSimulator = $release + '/p:Platform=iPhoneSimulator'
@@ -124,15 +124,15 @@ dotnet new unoapp-uitest -o UnoUITests01
 Assert-ExitCodeIsZero
 
 # Prism template test
-dotnet new unoapp-prism -o UnoUIPrism01
-& $msbuild $debug UnoUIPrism01\UnoUIPrism01.sln
-Assert-ExitCodeIsZero
+# dotnet new unoapp-prism -o UnoUIPrism01
+# & $msbuild $debug UnoUIPrism01\UnoUIPrism01.sln
+# Assert-ExitCodeIsZero
 
 # XF - Default
-7z x build\assets\xfapp-uwp-4.8.0.1451.zip -oXFApp
-
-pushd XFApp
-dotnet new wasmxfhead
-& $msbuild /ds /r /p:Configuration=Debug XFApp.Wasm\XFApp.Wasm.csproj
-Assert-ExitCodeIsZero
-popd
+# 7z x build\assets\xfapp-uwp-4.8.0.1451.zip -oXFApp
+# 
+# pushd XFApp
+# dotnet new wasmxfhead
+# & $msbuild /ds /r /p:Configuration=Debug XFApp.Wasm\XFApp.Wasm.csproj
+# Assert-ExitCodeIsZero
+# popd

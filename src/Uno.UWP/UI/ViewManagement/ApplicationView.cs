@@ -8,20 +8,29 @@ using Windows.Foundation;
 using Uno.Devices.Sensors;
 using Uno.Foundation.Extensibility;
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
+
+using Windows.Storage;
 
 namespace Windows.UI.ViewManagement
 {
 	public partial class ApplicationView
 		: IApplicationViewSpanningRects
 	{
+		private const string PreferredLaunchViewWidthKey = "__Uno.PreferredLaunchViewSizeKey.Width";
+		private const string PreferredLaunchViewHeightKey = "__Uno.PreferredLaunchViewSizeKey.Height";
+
 		private static ApplicationView _instance = new ApplicationView();
 
 		private ApplicationViewTitleBar _titleBar = new ApplicationViewTitleBar();
 		private IReadOnlyList<Rect> _defaultSpanningRects;
 		private IApplicationViewSpanningRects _applicationViewSpanningRects;
+
+		private void Initialize()
+		{
+			_instance = this;
+		}
 
 		[global::Uno.NotImplemented]
 		public int Id => 1;
@@ -91,6 +100,30 @@ namespace Windows.UI.ViewManagement
 			}
 		}
 
+		public static Size PreferredLaunchViewSize
+		{
+			get
+			{
+				if (ApplicationData.Current.LocalSettings.Values.TryGetValue(PreferredLaunchViewWidthKey, out var widthObject) &&
+					ApplicationData.Current.LocalSettings.Values.TryGetValue(PreferredLaunchViewHeightKey, out var heightObject) &&
+					widthObject is double width &&
+					heightObject is double height)
+				{
+					return new Size(width, height);
+				}
+				return Size.Empty;
+			}
+
+			set
+			{
+				double width = value.Width;
+				double height = value.Height;
+
+				ApplicationData.Current.LocalSettings.Values[PreferredLaunchViewWidthKey] = width;
+				ApplicationData.Current.LocalSettings.Values[PreferredLaunchViewHeightKey] = height;
+			}
+		}
+
 		public bool IsViewModeSupported(ApplicationViewMode viewMode)
 		{
 			if (viewMode == ApplicationViewMode.Default)
@@ -114,7 +147,7 @@ namespace Windows.UI.ViewManagement
 					return Task.FromResult(true);
 				}
 
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Warning))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Warning))
 				{
 					this.Log().LogWarning(
 						$"Cannot not enter view mode {viewMode}, " +
@@ -151,7 +184,7 @@ namespace Windows.UI.ViewManagement
 			{
 				VisibleBounds = newVisibleBounds;
 
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().Debug($"Updated visible bounds {VisibleBounds}");
 				}

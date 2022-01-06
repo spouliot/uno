@@ -11,8 +11,8 @@
 	<UnoUIUseRoslynSourceGenerators Condition="'$(UnoUIUseRoslynSourceGenerators)'=='' and '$(_isRoslynAnalyzerAvailable)' == 'true' and '$(_canUseRoslynAnalyzer)'=='true'">true</UnoUIUseRoslynSourceGenerators>
 	<UnoUIUseRoslynSourceGenerators Condition="'$(UnoUIUseRoslynSourceGenerators)'==''">false</UnoUIUseRoslynSourceGenerators>
 
-	<XamarinProjectType Condition="'$(ProjectTypeGuids)'=='{FEACFBD2-3405-455C-9665-78FE426C6842};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}' or $(TargetFramework.ToLower().StartsWith('xamarinios'))">ios</XamarinProjectType>
-	<XamarinProjectType Condition="'$(ProjectTypeGuids)'=='{EFBA0AD7-5A72-4C68-AF49-83D382785DCF};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}' or $(TargetFramework.ToLower().StartsWith('monoandroid'))">android</XamarinProjectType>
+	<XamarinProjectType Condition="'$(ProjectTypeGuids)'=='{FEACFBD2-3405-455C-9665-78FE426C6842};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}' or $(TargetFramework.ToLower().StartsWith('xamarinios')) or '$(TargetPlatformIdentifier)' == 'ios' OR '$(TargetFramework)' == 'net6.0-ios'">ios</XamarinProjectType>
+	<XamarinProjectType Condition="'$(ProjectTypeGuids)'=='{EFBA0AD7-5A72-4C68-AF49-83D382785DCF};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}' or $(TargetFramework.ToLower().StartsWith('monoandroid')) or '$(TargetPlatformIdentifier)' == 'android' OR '$(TargetFramework)' == 'net6.0-android'">android</XamarinProjectType>
 	<XamarinProjectType Condition="'$(ProjectTypeGuids)'=='{A3F8F2AB-B479-4A4A-A458-A89E7DC349F1};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}' or '$(TargetFramework)'=='xamarinmac20'">macos</XamarinProjectType>
 	<XamarinProjectType Condition="'$(UnoRuntimeIdentifier)'=='WebAssembly'">wasm</XamarinProjectType>
 	<XamarinProjectType Condition="'$(UnoRuntimeIdentifier)'=='Skia'">skia</XamarinProjectType>
@@ -42,6 +42,7 @@
 		<CompilerVisibleProperty Include="BuildingProject" />
 		<CompilerVisibleProperty Include="DesignTimeBuild" />
 		<CompilerVisibleProperty Include="UnoUISourceGeneratorDebuggerBreak" />
+		<CompilerVisibleProperty Include="IsHotReloadHost" />
 
 		<CompilerVisibleProperty Include="UseWPF" />
 		<CompilerVisibleProperty Include="IsUnoHead" />
@@ -60,6 +61,9 @@
 		<CompilerVisibleProperty Include="IncludeXamlNamespacesProperty" />
 		<CompilerVisibleProperty Include="XamlGeneratorAnalyzerSuppressionsProperty" />
 		<CompilerVisibleProperty Include="LegacyTypesProperty" />
+		<CompilerVisibleProperty Include="UnoXamlResourcesTrimming"/>
+		<CompilerVisibleProperty Include="BaseIntermediateOutputPath"/>
+		<CompilerVisibleProperty Include="AssemblyName"/>
 
 		<CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="SourceItemGroup" />
 		<CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="Link" />
@@ -86,8 +90,13 @@
 		  Condition="exists('$(MSBuildThisFileDirectory)..\Uno.UI.SourceGenerators.csproj')">
 
 	<ItemGroup >
-	  <Analyzer Include="$(MSBuildThisFileDirectory)..\bin\$(Configuration)\netstandard2.0\*.dll" />
-	  <AdditionalFiles Include="$(MSBuildThisFileDirectory)..\bin\$(Configuration)\netstandard2.0\*.dll"/>
+	  <_UnoAnalyzerExclusion Include="$(MSBuildThisFileDirectory)..\bin\$(Configuration)\netstandard2.0\Microsoft.CodeAnalysis.*.dll" />
+	  <_UnoAnalyzerExclusion Include="$(MSBuildThisFileDirectory)..\bin\$(Configuration)\netstandard2.0\System.*.dll" />
+
+	  <Analyzer Include="$(MSBuildThisFileDirectory)..\bin\$(Configuration)\netstandard2.0\*.dll"
+			  Exclude="@(_UnoAnalyzerExclusion)" />
+	  <AdditionalFiles Include="$(MSBuildThisFileDirectory)..\bin\$(Configuration)\netstandard2.0\*.dll"
+					 Exclude="@(_UnoAnalyzerExclusion)" />
 	  <!-- generator is automatically included in nuget package, no need to add it here -->
 	</ItemGroup>
   </Target>
@@ -366,6 +375,8 @@
 	<Message Importance="high"
 		   Condition="'$(UnoUIUseRoslynSourceGenerators)'==''"
 		   Text="Uno.UI is using Uno.SourceGenerators" />
+
+	  <WriteLinesToFile File="$(IntermediateOutputPath)\build-time-generator.touch" />
   </Target>
 
   <Target Name="_RemoveRoslynUnoSourceGeneration" BeforeTargets="CoreCompile" Condition="'$(UnoUIUseRoslynSourceGenerators)'=='false'">
@@ -380,7 +391,7 @@
 
   <Target Name="_UnoUIValidateLongPathSupport"
 		  BeforeTargets="CoreCompile"
-		  Condition="$([MSBuild]::IsOsPlatform(Windows)) and ( ('$(UnoUIUseRoslynSourceGenerators)'=='true' and '$(EmitCompilerGeneratedFiles)'=='true') or '$(MSBuildThisFileDirectory.Length)' &gt; 64)">
+		  Condition="'$(MSBuildRuntimeType)'!='Core' and $([MSBuild]::IsOsPlatform(Windows)) and ( ('$(UnoUIUseRoslynSourceGenerators)'=='true' and '$(EmitCompilerGeneratedFiles)'=='true') or '$(MSBuildThisFileDirectory.Length)' &gt; 64)">
 	<!---
 	Validation for LongPath support (source https://github.com/dotnet/roslyn/blob/c8eecdb9563127988b3cb564a493eae9ef254a88/eng/build.ps1#L607)
 	https://docs.microsoft.com/en-us/archive/blogs/jeremykuhne/net-4-6-2-and-long-paths-on-windows-10#enabling-win32-long-path-support
@@ -402,5 +413,23 @@
 	  Condition="$(MSBuildProjectFullPath.Contains('#')) and '$(UnoUIDisable5953Warning)'==''"
 	  Text="The path to your project contains the '#' character, which causes known build issues. Try moving your project to a different location. (See https://github.com/unoplatform/uno/issues/5953 for more details)."/>
   </Target>
+  
+  <Target Name="Roslyn51768Workaround"
+          BeforeTargets="BeforeBuild"
+				  Condition="'$(DisableRoslyn51768Workaround)'==''">
+	<!-- Workaround for https://github.com/dotnet/roslyn/issues/51768 -->
+	<CreateProperty Value="$(IntermediateOutputPath)$(MSBuildProjectName).d$(DesignTimeBuild)-b$(BuildingProject).GeneratedMSBuildEditorConfig.editorconfig">
+	  <Output
+		  TaskParameter="Value"
+		  PropertyName="GeneratedMSBuildEditorConfigFile" />
+	</CreateProperty>
+  </Target>
 
+  <Target Name="_GenerateReloadCookie" BeforeTargets="BeforeCompile" Condition="'$(DefaultLanguageSourceExtension)'=='.cs'">
+		<!-- Generate an empty C# file that OmniSharp can pick up when Uno has marked XAML files as modified -->
+		<WriteLinesToFile File="$(IntermediateOutputPath)\uno.reload.cookie.g.cs" />
+		<ItemGroup>
+			<Compile Include="$(IntermediateOutputPath)\uno.reload.cookie.g.cs" />
+		</ItemGroup>
+  </Target>
 </Project>

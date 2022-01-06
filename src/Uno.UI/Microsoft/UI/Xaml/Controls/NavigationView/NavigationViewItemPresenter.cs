@@ -1,5 +1,8 @@
-﻿// MUX Reference NavigationViewItemPresenter.cpp, commit de78834
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+// MUX Reference NavigationViewItemPresenter.cpp, commit 3f6310d
 
+using System;
 using Uno.UI.Helpers.WinUI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -8,9 +11,13 @@ using Windows.UI.Xaml.Media.Animation;
 
 namespace Microsoft.UI.Xaml.Controls.Primitives
 {
+	/// <summary>
+	/// Represents the visual elements of a NavigationViewItem.
+	/// </summary>
 	public partial class NavigationViewItemPresenter : ContentControl
 	{
 		private const string c_contentGrid = "PresenterContentRootGrid";
+		private const string c_infoBadgePresenter = "InfoBadgePresenter";
 		private const string c_expandCollapseChevron = "ExpandCollapseChevron";
 		private const string c_expandCollapseRotateExpandedStoryboard = "ExpandCollapseRotateExpandedStoryboard";
 		private const string c_expandCollapseRotateCollapsedStoryboard = "ExpandCollapseRotateCollapsedStoryboard";
@@ -19,6 +26,7 @@ namespace Microsoft.UI.Xaml.Controls.Primitives
 
 		public NavigationViewItemPresenter()
 		{
+			SetValue(TemplateSettingsProperty, new NavigationViewItemPresenterTemplateSettings());
 			DefaultStyleKey = typeof(NavigationViewItemPresenter);
 		}
 
@@ -35,6 +43,8 @@ namespace Microsoft.UI.Xaml.Controls.Primitives
 			{
 				m_contentGrid = contentGrid;
 			}
+
+			m_infoBadgePresenter = GetTemplateChild(c_infoBadgePresenter) as ContentPresenter;
 
 			var navigationViewItem = GetNavigationViewItem();
 			if (navigationViewItem != null)
@@ -123,6 +133,10 @@ namespace Microsoft.UI.Xaml.Controls.Primitives
 			if (state == NavigationViewItemHelper.c_OnLeftNavigation || state == NavigationViewItemHelper.c_OnLeftNavigationReveal || state == NavigationViewItemHelper.c_OnTopNavigationPrimary
 				|| state == NavigationViewItemHelper.c_OnTopNavigationPrimaryReveal || state == NavigationViewItemHelper.c_OnTopNavigationOverflow)
 			{
+				if (m_infoBadgePresenter is { } infoBadgePresenter)
+				{
+					infoBadgePresenter.Content = null;
+				}
 				return base.GoToElementStateCore(state, useTransitions);
 			}
 			return VisualStateManager.GoToState(this, state, useTransitions);
@@ -163,13 +177,11 @@ namespace Microsoft.UI.Xaml.Controls.Primitives
 			m_compactPaneLengthValue = compactPaneLength;
 			if (shouldUpdate)
 			{
-				var iconGridColumn = GetTemplateChild(c_iconBoxColumnDefinitionName) as ColumnDefinition;
-				if (iconGridColumn != null)
-				{
-					var gridLength = iconGridColumn.Width;
-					var newGridLength = new GridLength(compactPaneLength, gridLength.GridUnitType);
-					iconGridColumn.Width = newGridLength;
-				}
+				var templateSettings = TemplateSettings;
+				var gridLength = compactPaneLength;
+
+				templateSettings.IconWidth = gridLength;
+				templateSettings.SmallerIconWidth = Math.Max(0.0, gridLength - 8);
 			}
 		}
 

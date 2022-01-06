@@ -28,6 +28,10 @@ using UIKit;
 
 namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml
 {
+	#if NET6_0 && __ANDROID__
+	[Ignore("Disabled until https://github.com/dotnet/runtime/pull/55681 is released. See https://github.com/unoplatform/uno/issues/5873")]
+	#endif
+
 	[TestClass]
 	[RunsOnUIThread]
 	public class Given_FrameworkElement_And_Leak
@@ -37,6 +41,7 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml
 		[DataRow(typeof(XamlEvent_Leak_UserControl_xBind), 15)]
 		[DataRow(typeof(XamlEvent_Leak_UserControl_xBind_Event), 15)]
 		[DataRow(typeof(XamlEvent_Leak_TextBox), 15)]
+		[DataRow(typeof(Animation_Leak), 15)]
 		[DataRow(typeof(TextBox), 15)]
 		[DataRow(typeof(Button), 15)]
 		[DataRow(typeof(RadioButton), 15)]
@@ -45,7 +50,7 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml
 		[DataRow(typeof(ListView), 15)]
 		[DataRow(typeof(ProgressRing), 15)]
 		[DataRow(typeof(Pivot), 15)]
-		[DataRow(typeof(ScrollBar), 15)]
+		// [DataRow(typeof(ScrollBar), 15)] https://github.com/unoplatform/uno/issues/7331
 		[DataRow(typeof(Slider), 15)]
 		[DataRow(typeof(SymbolIcon), 15)]
 		[DataRow(typeof(Viewbox), 15)]
@@ -54,6 +59,7 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml
 		[DataRow(typeof(Canvas), 15)]
 		[DataRow(typeof(AutoSuggestBox), 15)]
 		[DataRow(typeof(AppBar), 15)]
+		[DataRow(typeof(CommandBar), 15)]
 		[DataRow(typeof(Border), 15)]
 		[DataRow(typeof(ContentControl), 15)]
 		[DataRow(typeof(ContentDialog), 15)]
@@ -61,6 +67,7 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml
 		[DataRow("Uno.UI.Samples.Content.UITests.ButtonTestsControl.AppBar_KeyBoard", 15)]
 		[DataRow("Uno.UI.Samples.Content.UITests.ButtonTestsControl.Buttons", 15)]
 		[DataRow("UITests.Windows_UI_Xaml.xLoadTests.xLoad_Test_For_Leak", 15)]
+		[DataRow("UITests.Windows_UI_Xaml_Controls.ToolTip.ToolTip_LeakTest", 15)]
 		public async Task When_Add_Remove(object controlTypeRaw, int count)
 		{
 #if TRACK_REFS
@@ -161,6 +168,7 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml
 			Assert.AreEqual(0, activeControls, retainedMessage);
 #endif
 
+#if NET5_0 || __IOS__ || __ANDROID__
 			static string? ExtractTargetName(KeyValuePair<DependencyObject, Holder> p)
 			{
 				if(p.Key is FrameworkElement fe)
@@ -172,6 +180,7 @@ namespace Uno.UI.RuntimeTests.Tests.Windows_UI_Xaml
 					return p.Key?.ToString();
 				}
 			}
+#endif
 
 			async Task MaterializeControl(Type controlType, ConditionalWeakTable<DependencyObject, Holder> _holders, int maxCounter, ContentControl rootContainer)
 			{

@@ -5,9 +5,13 @@ using Windows.Foundation;
 using Windows.UI.Xaml;
 using static System.Double;
 
+#if NET6_0_OR_GREATER && (__IOS__ || __MACOS__)
+using ObjCRuntime;
+#endif
+
 namespace Uno.UI
 {
-	internal static class LayoutHelper
+	internal static partial class LayoutHelper
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal static void Deconstruct(this Rect rect, out double x, out double y, out double width, out double height)

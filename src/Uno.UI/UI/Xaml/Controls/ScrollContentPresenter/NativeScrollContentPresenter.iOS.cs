@@ -5,7 +5,6 @@ using Uno.UI.Extensions;
 using Windows.UI.Xaml.Data;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using Uno.Disposables;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -13,12 +12,28 @@ using System.Linq;
 using Foundation;
 using UIKit;
 using CoreGraphics;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Windows.Foundation;
+using Windows.UI.Xaml.Controls.Primitives;
+using Uno.UI;
+using Uno.UI.UI.Xaml.Controls.Layouter;
+using Uno.UI.Xaml.Input;
+using DraggingEventArgs = UIKit.DraggingEventArgs;
+
+#if NET6_0_OR_GREATER
+using ObjCRuntime;
+#endif
+
+#if HAS_UNO_WINUI
+using Microsoft.UI.Input;
+#else
+using Windows.UI.Input;
+using Windows.Devices.Input;
+#endif
 
 namespace Windows.UI.Xaml.Controls
 {
-	partial class NativeScrollContentPresenter : UIScrollView, DependencyObject
+	partial class NativeScrollContentPresenter : UIScrollView, DependencyObject, ISetLayoutSlots
 	{
 		private readonly WeakReference<ScrollViewer> _scrollViewer;
 
@@ -54,7 +69,6 @@ namespace Windows.UI.Xaml.Controls
 
 		public NativeScrollContentPresenter()
 		{
-			TouchesManager = new ScrollContentPresenterManipulationManager(this);
 			Scrolled += OnScrolled;
 			ViewForZoomingInScrollView = _ => Content as UIView;
 			DidZoom += OnZoom;
@@ -79,7 +93,7 @@ namespace Windows.UI.Xaml.Controls
 		private void InvokeOnScroll()
 		{
 			var scroller = GetParentScrollViewer();
-			if (scroller is null)
+			if (scroller is null || scroller.Presenter is null)
 			{
 				return;
 			}
@@ -88,7 +102,7 @@ namespace Windows.UI.Xaml.Controls
 			var clampedOffset = scroller.ShouldReportNegativeOffsets
 				? ContentOffset
 				: ContentOffset.Clamp(CGPoint.Empty, UpperScrollLimit);
-			scroller.OnScrollInternal(clampedOffset.X, clampedOffset.Y, isIntermediate: _isInAnimatedScroll);
+			scroller.Presenter.OnNativeScroll(clampedOffset.X, clampedOffset.Y, isIntermediate: _isInAnimatedScroll);
 		}
 
 		private ScrollViewer GetParentScrollViewer() => _scrollViewer.TryGetTarget(out var s) ? s : TemplatedParent as ScrollViewer;
@@ -129,7 +143,10 @@ namespace Windows.UI.Xaml.Controls
 
 		private void OnZoom(object sender, EventArgs e)
 		{
-			(TemplatedParent as ScrollViewer)?.OnZoomInternal((float)ZoomScale);
+			if (GetParentScrollViewer()?.Presenter is { } presenter)
+			{
+				presenter.OnNativeZoom((float)ZoomScale);
+			}
 		}
 
 		public override void SetContentOffset(CGPoint contentOffset, bool animated)
@@ -160,11 +177,7 @@ namespace Windows.UI.Xaml.Controls
 			base.SetNeedsLayout();
 
 			_requiresMeasure = true;
-
-			if (Superview != null)
-			{
-				Superview.SetNeedsLayout();
-			}
+			Superview?.SetNeedsLayout();
 		}
 
 		#region Layouting
@@ -239,46 +252,57 @@ namespace Windows.UI.Xaml.Controls
 		{
 			try
 			{
-				if (Content != null)
+				if (_content is null)
 				{
-					if (_requiresMeasure)
-					{
-						_requiresMeasure = false;
-						SizeThatFits(Frame.Size);
-					}
-
-					double horizontalMargin = 0;
-					double verticalMargin = 0;
-
-					var frameworkElement = _content as IFrameworkElement;
-
-					if (frameworkElement != null)
-					{
-						horizontalMargin = frameworkElement.Margin.Left + frameworkElement.Margin.Right;
-						verticalMargin = frameworkElement.Margin.Top + frameworkElement.Margin.Bottom;
-
-						var adjustedMeasure = new CGSize(
-							GetAdjustedArrangeWidth(frameworkElement, (nfloat)horizontalMargin),
-							GetAdjustedArrangeHeight(frameworkElement, (nfloat)verticalMargin)
-						);
-
-						// Zoom works by applying a transform to the child view. If a view has a non-identity transform, its Frame shouldn't be set.
-						if (ZoomScale == 1)
-						{
-							_content.Frame = new CGRect(
-								GetAdjustedArrangeX(frameworkElement, adjustedMeasure, horizontalMargin),
-								GetAdjustedArrangeY(frameworkElement, adjustedMeasure, verticalMargin),
-								adjustedMeasure.Width,
-								adjustedMeasure.Height
-							);
-						}
-					}
-
-					ContentSize = AdjustContentSize(_content.Frame.Size + new CGSize(horizontalMargin, verticalMargin));
-
-					// This prevents unnecessary touch delays (which affects the pressed visual states of buttons) when user can't scroll.
-					UpdateDelayedTouches();
+					return;
 				}
+
+				var frame = Frame;
+				if (_requiresMeasure)
+				{
+					_requiresMeasure = false;
+					SizeThatFits(frame.Size);
+				}
+
+				var contentMargin = default(Thickness);
+				if (_content is IFrameworkElement iFwElt)
+				{
+					contentMargin = iFwElt.Margin;
+
+					var adjustedMeasure = new CGSize(
+						GetAdjustedArrangeWidth(iFwElt, (nfloat)contentMargin.Horizontal()),
+						GetAdjustedArrangeHeight(iFwElt, (nfloat)contentMargin.Vertical())
+					);
+
+					// Zoom works by applying a transform to the child view. If a view has a non-identity transform, its Frame shouldn't be set.
+					if (ZoomScale == 1)
+					{
+						_content.Frame = new CGRect(
+							GetAdjustedArrangeX(iFwElt, adjustedMeasure, (nfloat)contentMargin.Horizontal()),
+							GetAdjustedArrangeY(iFwElt, adjustedMeasure, (nfloat)contentMargin.Vertical()),
+							adjustedMeasure.Width,
+							adjustedMeasure.Height
+						);
+					}
+				}
+
+				// Sets the scroll extents using the effective Frame of the content
+				// (which might be different than the frame set above if the '_content' has some layouting constraints).
+				// Noticeably, it will be the case if the '_content' is bigger than the viewport.
+				var finalRect = (Rect)_content.Frame;
+				var extentSize = AdjustContentSize(finalRect.InflateBy(contentMargin).Size);
+
+				ContentSize = extentSize;
+
+				// ISetLayoutSlots contract implementation
+				LayoutInformation.SetLayoutSlot(_content, new Rect(default, ((Size)extentSize).AtLeast(frame.Size)));
+				if (_content is UIElement uiElt)
+				{
+					uiElt.LayoutSlotWithMarginsAndAlignments = finalRect;
+				}
+
+				// This prevents unnecessary touch delays (which affects the pressed visual states of buttons) when user can't scroll.
+				UpdateDelayedTouches();
 			}
 			catch (Exception e)
 			{
@@ -494,13 +518,57 @@ namespace Windows.UI.Xaml.Controls
 		}
 		#endregion
 
-		public Rect MakeVisible(UIElement visual, Rect rectangle)
-		{
-			ScrollViewExtensions.BringIntoView(this, visual, BringIntoViewMode.ClosestEdge);
-			return rectangle;
-		}
+		bool INativeScrollContentPresenter.Set(
+			double? horizontalOffset,
+			double? verticalOffset,
+			float? zoomFactor,
+			bool disableAnimation,
+			bool isIntermediate)
+			=> throw new NotImplementedException();
 
 		#region Touches
+
+		private UIElement _touchTarget;
+
+		/// <inheritdoc />
+		public override void TouchesBegan(NSSet touches, UIEvent evt)
+		{
+			base.TouchesBegan(touches, evt);
+
+			// We wait for the first touches to get the parent so we don't have to track Loaded/UnLoaded
+			// Like native dispatch on iOS, we do "implicit captures" the target.
+			if (this.GetParent() is UIElement parent)
+			{
+				_touchTarget = parent;
+				_touchTarget.TouchesBegan(touches, evt);
+			}
+		}
+
+		/// <inheritdoc />
+		public override void TouchesMoved(NSSet touches, UIEvent evt)
+		{
+			base.TouchesMoved(touches, evt);
+
+			_touchTarget?.TouchesMoved(touches, evt);
+		}
+
+		/// <inheritdoc />
+		public override void TouchesEnded(NSSet touches, UIEvent evt)
+		{
+			base.TouchesEnded(touches, evt);
+
+			_touchTarget?.TouchesEnded(touches, evt);
+			_touchTarget = null;
+		}
+
+		/// <inheritdoc />
+		public override void TouchesCancelled(NSSet touches, UIEvent evt)
+		{
+			base.TouchesCancelled(touches, evt);
+
+			_touchTarget?.TouchesCancelled(touches, evt);
+			_touchTarget = null;
+		}
 
 		/*
 		 * By default the UIScrollView will delay the touches to the content until it detects
@@ -515,11 +583,12 @@ namespace Windows.UI.Xaml.Controls
 		 * On the UIElement this is defined by the ManipulationMode.
 		 */
 
-		internal UIElement.TouchesManager TouchesManager { get; }
+		private TouchesManager _touchesManager;
+		internal TouchesManager TouchesManager => _touchesManager ??= new NativeScrollContentPresenterManipulationManager(this);
 
 		private void UpdateDelayedTouches()
 		{
-			if (TouchesManager.Listeners == 0)
+			if ((_touchesManager?.Listeners ?? 0) == 0)
 			{
 				// This prevents unnecessary touch delays (which affects the pressed visual states of buttons) when user can't scroll.
 				var canScrollVertically = VerticalScrollBarVisibility != ScrollBarVisibility.Disabled && ContentSize.Height > Frame.Height;
@@ -532,14 +601,20 @@ namespace Windows.UI.Xaml.Controls
 			}
 		}
 
-		private class ScrollContentPresenterManipulationManager : UIElement.TouchesManager
+		private class NativeScrollContentPresenterManipulationManager : TouchesManager
 		{
 			private readonly NativeScrollContentPresenter _scrollPresenter;
 
-			public ScrollContentPresenterManipulationManager(NativeScrollContentPresenter scrollPresenter)
+			public NativeScrollContentPresenterManipulationManager(NativeScrollContentPresenter scrollPresenter)
 			{
 				_scrollPresenter = scrollPresenter;
 			}
+
+			/// <inheritdoc />
+			protected override bool CanConflict(GestureRecognizer.Manipulation manipulation)
+				=> _scrollPresenter.CanHorizontallyScroll && manipulation.IsTranslateXEnabled
+					|| _scrollPresenter.CanVerticallyScroll && manipulation.IsTranslateYEnabled
+					|| manipulation.IsDragManipulation; // This will actually always be false when CanConflict is being invoked in current setup.
 
 			/// <inheritdoc />
 			protected override void SetCanDelay(bool canDelay)
@@ -549,6 +624,6 @@ namespace Windows.UI.Xaml.Controls
 			protected override void SetCanCancel(bool canCancel)
 				=> _scrollPresenter.CanCancelContentTouches = canCancel;
 		}
-	#endregion
+		#endregion
 	}
 }

@@ -9,8 +9,11 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Shapes;
+
+#if HAS_UNO
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
+#endif
 
 #if NETCOREAPP
 using Microsoft.UI;
@@ -20,12 +23,18 @@ using Microsoft.UI;
 using CoreGraphics;
 #endif
 
+#if NET6_0_OR_GREATER && (__IOS__ || __MACOS__)
+using ObjCRuntime;
+#endif
+
 namespace Uno.UI.Toolkit
 {
+#if !NET6_0_OR_GREATER // Moved to the linker definition file
 #if __IOS__
 	[global::Foundation.PreserveAttribute(AllMembers = true)]
 #elif __ANDROID__
 	[Android.Runtime.PreserveAttribute(AllMembers = true)]
+#endif
 #endif
 	public static class UIElementExtensions
 	{
@@ -320,7 +329,9 @@ namespace Uno.UI.Toolkit
 
 			if (property == null)
 			{
+#if HAS_UNO
 				uiElement.Log().Warn($"The {propertyName} dependency property does not exist on {type}");
+#endif
 			}
 #if !NETFX_CORE && !NETCOREAPP
 			else if (property.Type != propertyType)

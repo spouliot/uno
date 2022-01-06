@@ -1,7 +1,7 @@
 ﻿<Project Sdk="MSBuild.Sdk.Extras">
 
   <PropertyGroup>
-    <TargetFrameworks>net47;netcoreapp3.1;net5.0-windows</TargetFrameworks>
+    <TargetFrameworks>net47;netcoreapp3.1</TargetFrameworks>
   </PropertyGroup>
 
 	<Import Project="../netcore-build-windows.props" />
@@ -20,6 +20,9 @@
 	
 		<UseCommonOverridePackage>true</UseCommonOverridePackage>
 		<UseWPF Condition="'$(TargetFramework)'=='netcoreapp3.1' or '$(TargetFramework)'=='net5.0-windows'">true</UseWPF>
+
+		<!-- 9.0 to work around a VS 2019 build issue -->
+		<LangVersion>9.0</LangVersion>
 	</PropertyGroup>
 	
 	<ItemGroup>
@@ -29,7 +32,7 @@
 	<Import Project="..\Uno.CrossTargetting.props" />
 
 	<ItemGroup>
-		<PackageReference Include="SkiaSharp.Views" />
+		<PackageReference Include="SkiaSharp.Views.WPF" />
 	</ItemGroup>
 
 	<ItemGroup>

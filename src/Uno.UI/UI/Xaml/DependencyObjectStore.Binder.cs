@@ -4,7 +4,7 @@ using System;
 using System.Linq;
 using Uno.Disposables;
 using System.Runtime.CompilerServices;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.Extensions;
 using Uno.UI.DataBinding;
 using Uno.UI;
@@ -71,7 +71,7 @@ namespace Windows.UI.Xaml
 
 				_isApplyingTemplateBindings = true;
 
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().DebugFormat(
 						"{0}.ApplyTemplateBindings({1}/{2}) (h:{3:X8})",
@@ -96,7 +96,7 @@ namespace Windows.UI.Xaml
 
 		private void ApplyChildrenBindable(object? inheritedValue, bool isTemplatedParent)
 		{
-			void SetInherited(IDependencyObjectStoreProvider provider)
+			static void SetInherited(IDependencyObjectStoreProvider provider, object? inheritedValue, bool isTemplatedParent)
 			{
 				if (isTemplatedParent)
 				{
@@ -107,6 +107,7 @@ namespace Windows.UI.Xaml
 					provider.Store.SetInheritedDataContext(inheritedValue);
 				}
 			}
+
 			for (int i = 0; i < _childrenBindable.Count; i++)
 			{
 				var child = _childrenBindable[i];
@@ -130,7 +131,7 @@ namespace Windows.UI.Xaml
 
 				if (childAsStoreProvider != null)
 				{
-					SetInherited(childAsStoreProvider);
+					SetInherited(childAsStoreProvider, inheritedValue, isTemplatedParent);
 				}
 				else
 				{
@@ -147,7 +148,7 @@ namespace Windows.UI.Xaml
 							{
 								if (list[childIndex] is IDependencyObjectStoreProvider provider2)
 								{
-									SetInherited(provider2);
+									SetInherited(provider2, inheritedValue, isTemplatedParent);
 								}
 							}
 						}
@@ -157,7 +158,7 @@ namespace Windows.UI.Xaml
 							{
 								if (item is IDependencyObjectStoreProvider provider2)
 								{
-									SetInherited(provider2);
+									SetInherited(provider2, inheritedValue, isTemplatedParent);
 								}
 							}
 						}
@@ -297,11 +298,21 @@ namespace Windows.UI.Xaml
 
 					if (TryWriteDataContextChangedEventActivity() is { } trace)
 					{
-						// "using" statements are costly under we https://github.com/dotnet/runtime/issues/50783
-						using (trace)
+						/// <remarks>
+						/// This method contains or is called by a try/catch containing method and
+						/// can be significantly slower than other methods as a result on WebAssembly.
+						/// See https://github.com/dotnet/runtime/issues/56309
+						/// </remarks>
+						void ApplyWithTrace (object? actualDataContext, IDisposable trace)
 						{
-							ApplyDataContext(actualDataContext);
+							using (trace)
+							{
+								ApplyDataContext(actualDataContext);
+							}
 						}
+
+						// "using" statements are costly under we https://github.com/dotnet/runtime/issues/50783
+						ApplyWithTrace(actualDataContext, trace);
 					}
 					else
 					{
@@ -388,14 +399,14 @@ namespace Windows.UI.Xaml
 			}
 		}
 
-		internal void SetResourceBinding(DependencyProperty dependencyProperty, SpecializedResourceDictionary.ResourceKey resourceKey, bool isTheme, object context, DependencyPropertyValuePrecedences? precedence, BindingPath? setterBindingPath)
+		internal void SetResourceBinding(DependencyProperty dependencyProperty, SpecializedResourceDictionary.ResourceKey resourceKey, ResourceUpdateReason updateReason, object context, DependencyPropertyValuePrecedences? precedence, BindingPath? setterBindingPath)
 		{
 			if (precedence == null && _overriddenPrecedences?.Count > 0)
 			{
 				precedence = _overriddenPrecedences.Peek();
 			}
 
-			var binding = new ResourceBinding(resourceKey, isTheme, context, precedence ?? DependencyPropertyValuePrecedences.Local, setterBindingPath);
+			var binding = new ResourceBinding(resourceKey, updateReason, context, precedence ?? DependencyPropertyValuePrecedences.Local, setterBindingPath);
 			SetBinding(dependencyProperty, binding);
 		}
 
@@ -504,7 +515,7 @@ namespace Windows.UI.Xaml
 			{
 				// This guards against the scenario where inherited DataContext is removed when the view is removed from the visual tree,
 				// in which case 2-way bindings should not be updated.
-				if (this.Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+				if (this.Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 				{
 					this.Log().DebugFormat("SetSourceValue() not called because inherited property is being unset.");
 				}
@@ -543,7 +554,7 @@ namespace Windows.UI.Xaml
 				}
 				else
 				{
-					if (typeof(DependencyProperty).Log().IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+					if (typeof(DependencyProperty).Log().IsEnabled(Uno.Foundation.Logging.LogLevel.Debug))
 					{
 						typeof(DependencyProperty).Log().DebugFormat(
 							"Unable to find the dependency property [{0}] on type [{1}]"
@@ -561,43 +572,68 @@ namespace Windows.UI.Xaml
 		{
 			SetBindingValue(propertyDetails, args.NewValue);
 
-			var (hasValueInherits, hasValueDoesNotInherit) = GetPropertyInheritanceConfiguration(propertyDetails);
+			GetPropertyInheritanceConfiguration(
+				propertyDetails: propertyDetails,
+				args: args,
+				hasValueInherits: out var hasValueInherits,
+				hasValueDoesNotInherit: out var hasValueDoesNotInherits
+			);
 
-			if (!hasValueDoesNotInherit && hasValueInherits)
+			if (!hasValueDoesNotInherits)
 			{
-				if (args.NewValue is IDependencyObjectStoreProvider provider)
+				var newValueAsProvider = args.NewValue as IDependencyObjectStoreProvider;
+
+				if (hasValueInherits)
 				{
-					_childrenBindable[GetOrCreateChildBindablePropertyIndex(propertyDetails.Property)] =
-						provider.Store.Parent != ActualInstance ? args.NewValue : null;
+					if (newValueAsProvider != null)
+					{
+						SetChildrenBindableValue(
+							propertyDetails,
+							newValueAsProvider.Store.Parent != ActualInstance ? args.NewValue : null);
+					}
+					else
+					{
+						SetChildrenBindableValue(propertyDetails, args.NewValue);
+					}
 				}
 				else
 				{
-					_childrenBindable[GetOrCreateChildBindablePropertyIndex(propertyDetails.Property)] = args.NewValue;
+					if (newValueAsProvider is { }
+						&& !(newValueAsProvider is UIElement))
+					{
+						SetChildrenBindableValue(propertyDetails, newValueAsProvider);
+					}
 				}
 			}
 		}
 
-		(bool hasValueInherits, bool hasValueDoesNotInherit) GetPropertyInheritanceConfiguration(DependencyPropertyDetails propertyDetails)
+		private void SetChildrenBindableValue(DependencyPropertyDetails propertyDetails, object? value)
+			=> _childrenBindable[GetOrCreateChildBindablePropertyIndex(propertyDetails.Property)] = value;
+
+		private void GetPropertyInheritanceConfiguration(
+			DependencyPropertyDetails propertyDetails,
+			DependencyPropertyChangedEventArgs args,
+			out bool hasValueInherits,
+			out bool hasValueDoesNotInherit)
 		{
-			if (
-				propertyDetails.Property == _templatedParentProperty
-				|| propertyDetails.Property == _dataContextProperty
-			)
+			if (propertyDetails.Property == _templatedParentProperty
+				|| propertyDetails.Property == _dataContextProperty)
 			{
-				// DataContext is inherited
 				// TemplatedParent is a DependencyObject but does not propagate datacontext
-				return (false, true);
+				hasValueInherits = false;
+				hasValueDoesNotInherit = true;
+				return;
 			}
 
 			if (propertyDetails.Metadata is FrameworkPropertyMetadata propertyMetadata)
 			{
-				return (
-					propertyMetadata.Options.HasValueInheritsDataContext()
-					, propertyMetadata.Options.HasValueDoesNotInheritDataContext()
-				);
+				hasValueInherits = propertyMetadata.Options.HasValueInheritsDataContext();
+				hasValueDoesNotInherit = propertyMetadata.Options.HasValueDoesNotInheritDataContext();
+				return;
 			}
 
-			return (false, false);
+			hasValueInherits = false;
+			hasValueDoesNotInherit = false;
 		}
 
 		/// <summary>

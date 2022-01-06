@@ -6,11 +6,11 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Microsoft.Extensions.Logging;
+
 using Uno.Extensions;
 using Uno.Foundation;
 using Uno.Foundation.Interop;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Windows.Foundation.Collections;
 
 namespace Windows.Storage
@@ -127,7 +127,18 @@ namespace Windows.Storage
 				=> throw new NotSupportedException();
 
 			public IEnumerator<KeyValuePair<string, object>> GetEnumerator()
-				=> throw new NotSupportedException();
+			{
+				List<KeyValuePair<string, object>> kvps = new List<KeyValuePair<string, object>>();
+
+				for (int index = 0; index < Count; index++)
+				{
+					var key = ApplicationDataContainerInterop.GetKeyByIndex(_locality, index);
+					var value = ApplicationDataContainerInterop.GetValueByIndex(_locality, index);
+					kvps.Add(new KeyValuePair<string, object>(key, value));
+				}
+
+				return kvps.GetEnumerator();
+			}
 
 			public bool Remove(string key)
 			{
@@ -149,7 +160,7 @@ namespace Windows.Storage
 				return false;
 			}
 
-			IEnumerator IEnumerable.GetEnumerator() => throw new NotSupportedException();
+			IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
 			private void ReadFromLegacyFile()
 			{

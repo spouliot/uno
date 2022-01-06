@@ -8,10 +8,10 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Microsoft.Extensions.Logging;
+
 using Uno.Disposables;
 using Uno.Extensions;
-using Uno.Logging;
+using Uno.Foundation.Logging;
 using Uno.UI.DataBinding;
 using Uno.UI.Extensions;
 using Windows.UI.Core;
@@ -21,6 +21,13 @@ using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Uno.UI;
 using Uno.UI.Xaml;
+
+#if HAS_UNO_WINUI
+using Microsoft.UI.Input;
+#else
+using Windows.Devices.Input;
+using Windows.UI.Input;
+#endif
 
 namespace Windows.UI.Xaml
 {
@@ -44,7 +51,7 @@ namespace Windows.UI.Xaml
 				Windows.UI.Xaml.Window.Current.CoreWindow.PointerCancelled += CoreWindow_PointerCancelled;
 			}
 
-			private void CoreWindow_PointerWheelChanged(CoreWindow sender, PointerEventArgs args)
+			private void CoreWindow_PointerWheelChanged(CoreWindow sender, Windows.UI.Core.PointerEventArgs args)
 			{
 				var (originalSource, _) = VisualTreeHelper.HitTest(args.CurrentPoint.Position);
 
@@ -74,7 +81,7 @@ namespace Windows.UI.Xaml
 				RaiseUsingCaptures(Wheel, originalSource, routedArgs);
 			}
 
-			private void CoreWindow_PointerEntered(CoreWindow sender, PointerEventArgs args)
+			private void CoreWindow_PointerEntered(CoreWindow sender, Windows.UI.Core.PointerEventArgs args)
 			{
 				var (originalSource, _) = VisualTreeHelper.HitTest(args.CurrentPoint.Position);
 
@@ -103,10 +110,20 @@ namespace Windows.UI.Xaml
 				Raise(Enter, originalSource, routedArgs);
 			}
 
-			private void CoreWindow_PointerExited(CoreWindow sender, PointerEventArgs args)
+			private void CoreWindow_PointerExited(CoreWindow sender, Windows.UI.Core.PointerEventArgs args)
 			{
 				// This is how UWP behaves: when out of the bounds of the Window, the root element is use.
 				var originalSource = Windows.UI.Xaml.Window.Current.Content;
+				if (originalSource == null)
+				{
+					if (this.Log().IsEnabled(LogLevel.Trace))
+					{
+						this.Log().Trace($"CoreWindow_PointerExited ({args.CurrentPoint.Position}) Called before window content set.");
+					}
+
+					return;
+				}
+
 				var overBranchLeaf = VisualTreeHelper.SearchDownForLeaf(originalSource, _isOver);
 
 				if (overBranchLeaf is null)
@@ -127,9 +144,15 @@ namespace Windows.UI.Xaml
 				var routedArgs = new PointerRoutedEventArgs(args, originalSource);
 
 				Raise(Leave, overBranchLeaf, routedArgs);
+				if (!args.CurrentPoint.IsInContact && (PointerDeviceType)args.CurrentPoint.Pointer.Type == PointerDeviceType.Touch)
+				{
+					// We release the captures on exit when pointer if not pressed
+					// Note: for a "Tap" with a finger the sequence is Up / Exited / Lost, so the lost cannot be raised on Up
+					ReleaseCaptures(routedArgs);
+				}
 			}
 
-			private void CoreWindow_PointerPressed(CoreWindow sender, PointerEventArgs args)
+			private void CoreWindow_PointerPressed(CoreWindow sender, Windows.UI.Core.PointerEventArgs args)
 			{
 				var (originalSource, _) = VisualTreeHelper.HitTest(args.CurrentPoint.Position);
 
@@ -159,9 +182,10 @@ namespace Windows.UI.Xaml
 				Raise(Pressed, originalSource, routedArgs);
 			}
 
-			private void CoreWindow_PointerReleased(CoreWindow sender, PointerEventArgs args)
+			private void CoreWindow_PointerReleased(CoreWindow sender, Windows.UI.Core.PointerEventArgs args)
 			{
 				var (originalSource, _) = VisualTreeHelper.HitTest(args.CurrentPoint.Position);
+				var isOutOfWindow = originalSource is null;
 
 				// Even if impossible for the Release, we are fallbacking on the RootElement for safety
 				// This is how UWP behaves: when out of the bounds of the Window, the root element is use.
@@ -186,10 +210,16 @@ namespace Windows.UI.Xaml
 				var routedArgs = new PointerRoutedEventArgs(args, originalSource);
 
 				RaiseUsingCaptures(Released, originalSource, routedArgs);
+				if (isOutOfWindow || (PointerDeviceType)args.CurrentPoint.Pointer.Type != PointerDeviceType.Touch)
+				{
+					// We release the captures on up but only after the released event and processed the gesture
+					// Note: For a "Tap" with a finger the sequence is Up / Exited / Lost, so we let the Exit raise the capture lost
+					ReleaseCaptures(routedArgs);
+				}
 				ClearPressedState(routedArgs);
 			}
 
-			private void CoreWindow_PointerMoved(CoreWindow sender, PointerEventArgs args)
+			private void CoreWindow_PointerMoved(CoreWindow sender, Windows.UI.Core.PointerEventArgs args)
 			{
 				var (originalSource, staleBranch) = VisualTreeHelper.HitTest(args.CurrentPoint.Position, isStale: _isOver);
 
@@ -230,7 +260,7 @@ namespace Windows.UI.Xaml
 				RaiseUsingCaptures(Move, originalSource, routedArgs);
 			}
 
-			private void CoreWindow_PointerCancelled(CoreWindow sender, PointerEventArgs args)
+			private void CoreWindow_PointerCancelled(CoreWindow sender, Windows.UI.Core.PointerEventArgs args)
 			{
 				var (originalSource, _) = VisualTreeHelper.HitTest(args.CurrentPoint.Position);
 
@@ -256,7 +286,19 @@ namespace Windows.UI.Xaml
 				var routedArgs = new PointerRoutedEventArgs(args, originalSource);
 
 				RaiseUsingCaptures(Cancelled, originalSource, routedArgs);
+				// Note: No ReleaseCaptures(routedArgs);, the cancel automatically raise it
 				ClearPressedState(routedArgs);
+			}
+
+			private void ReleaseCaptures(PointerRoutedEventArgs routedArgs)
+			{
+				if (PointerCapture.TryGet(routedArgs.Pointer, out var capture))
+				{
+					foreach (var target in capture.Targets)
+					{
+						target.Element.ReleasePointerCapture(capture.Pointer.UniqueId, kinds: PointerCaptureKind.Any);
+					}
+				}
 			}
 
 			private void ClearPressedState(PointerRoutedEventArgs routedArgs)
@@ -275,7 +317,7 @@ namespace Windows.UI.Xaml
 				}
 			}
 
-#region Helpers
+			#region Helpers
 			private delegate void RaisePointerEventArgs(UIElement element, PointerRoutedEventArgs args, BubblingContext ctx);
 
 			private static readonly RaisePointerEventArgs Wheel = (elt, args, ctx) => elt.OnPointerWheel(args, ctx);
@@ -320,7 +362,7 @@ namespace Windows.UI.Xaml
 					}
 					else
 					{
-						var explicitTarget = targets.Find(c => c.Kind == PointerCaptureKind.Explicit)!;
+						var explicitTarget = targets.Find(c => c.Kind.HasFlag(PointerCaptureKind.Explicit))!;
 
 						raise(explicitTarget.Element, routedArgs, BubblingContext.Bubble);
 
@@ -341,7 +383,7 @@ namespace Windows.UI.Xaml
 					raise(originalSource, routedArgs, BubblingContext.Bubble);
 				}
 			}
-#endregion
+			#endregion
 		}
 
 		// TODO Should be per CoreWindow
@@ -355,7 +397,7 @@ namespace Windows.UI.Xaml
 			}
 		}
 
-#region HitTestVisibility
+		#region HitTestVisibility
 		internal void UpdateHitTest()
 		{
 			this.CoerceValue(HitTestVisibilityProperty);
@@ -424,13 +466,13 @@ namespace Windows.UI.Xaml
 			this.ClearValue(HitTestVisibilityProperty);
 		}
 
-#endregion
+		#endregion
 
 		partial void CapturePointerNative(Pointer pointer)
-			=> CoreWindow.GetForCurrentThread()!.SetPointerCapture();
+			=> CoreWindow.GetForCurrentThread()!.SetPointerCapture(pointer.UniqueId);
 
 		partial void ReleasePointerNative(Pointer pointer)
-			=> CoreWindow.GetForCurrentThread()!.ReleasePointerCapture();
+			=> CoreWindow.GetForCurrentThread()!.ReleasePointerCapture(pointer.UniqueId);
 	}
 }
 #endif

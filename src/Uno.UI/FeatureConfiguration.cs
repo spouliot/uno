@@ -8,7 +8,7 @@ using Windows.UI.Xaml.Controls;
 using Uno.UI.Xaml.Controls;
 using System.ComponentModel;
 using Windows.UI.Xaml.Media;
-using Microsoft.Extensions.Logging;
+using Uno.Foundation.Logging;
 
 namespace Uno.UI
 {
@@ -198,7 +198,7 @@ namespace Uno.UI
 			/// </summary>
 			/// <remarks>
 			/// This setting impacts significantly the loading performance of controls on Android.
-			/// Setting it to <see cref="true"/> avoids the use of costly Java->C# interop.
+			/// Setting it to true avoids the use of costly Java->C# interop.
 			/// </remarks>
 			public static bool AndroidUseManagedLoadedUnloaded { get; set; } = true;
 #endif
@@ -210,9 +210,15 @@ namespace Uno.UI
 			/// </summary>
 			/// <remarks>
 			/// This setting impacts significantly the loading performance of controls on Web Assembly.
-			/// Setting it to <see cref="true"/> avoids the use of costly JavaScript->C# interop.
+			/// Setting it to true avoids the use of costly JavaScript->C# interop.
 			/// </remarks>
 			public static bool WasmUseManagedLoadedUnloaded { get; set; } = true;
+
+			/// <summary>
+			/// When false, skips the FrameworkElement Loading/Loaded/Unloaded exception handling. This can be
+			/// disabled to improve application performance on WebAssembly. See See #7005 for additional details.
+			/// </summary>
+			public static bool HandleLoadUnloadExceptions { get; set; } = true;
 		}
 
 		public static class Image
@@ -240,6 +246,15 @@ namespace Uno.UI
 			/// Determines if the binding engine should ignore identical references in binding paths.
 			/// </summary>
 			public static bool IgnoreINPCSameReferences { get; set; } = false;
+		}
+
+		public static class BindingExpression
+		{
+			/// <summary>
+			/// When false, skips the BindingExpression.SetTargetValue exception handling. Can be disabled to
+			/// improve application performance on WebAssembly. See See #7005 for additional details.
+			/// </summary>
+			public static bool HandleSetTargetValueExceptions { get; set; } = true;
 		}
 
 		public static class Popup
@@ -337,7 +352,7 @@ namespace Uno.UI
 			public static IDictionary<Type, bool> UseUWPDefaultStylesOverride { get; } = new Dictionary<Type, bool>();
 
 			/// <summary>
-			/// This enables native frame navigation on Android and iOS by setting related classes (<see cref="Frame"/>, <see cref="Windows.UI.Xaml.Controls.CommandBar"/>
+			/// This enables native frame navigation on Android and iOS by setting related classes (<see cref="Frame"/>, <see cref="CommandBar"/>
 			/// and <see cref="Windows.UI.Xaml.Controls.AppBarButton"/>) to use their native styles.
 			/// </summary>
 			public static void ConfigureNativeFrameNavigation()
@@ -374,6 +389,18 @@ namespace Uno.UI
 			/// </summary>
 			/// <remarks>This feature is used to avoid screenshot comparisons false positives</remarks>
 			public static bool HideCaret { get; set; } = false;
+
+#if __ANDROID__
+			/// <summary>
+			/// The legacy <see cref="Windows.UI.Xaml.Controls.TextBox.InputScope"/> prevents invalid input on hardware keyboard.
+			/// This property defaults to <see langword="false"/> matching UWP, where InputScope only affects the keyboard layout,
+			/// but doesn't do any validation.
+			/// </summary>
+			/// <remarks>
+			/// This is available on Android only
+			/// </remarks>
+			public static bool UseLegacyInputScope { get; set; }
+#endif
 		}
 
 		public static class ScrollViewer
@@ -493,6 +520,16 @@ namespace Uno.UI
 #endif
 		}
 
+		public static class VisualState
+		{
+			/// <summary>
+			/// When this is set, the <see cref="Windows.UI.Xaml.VisualState.Setters"/> will be applied synchronously when changing state,
+			/// unlike UWP which waits the for the end of the <see cref="VisualTransition.Storyboard"/> (if any) to apply them.
+			/// </summary>
+			/// <remarks>This flag is for backward compatibility with old versions of uno and should not be turned on.</remarks>
+			public static bool ApplySettersBeforeTransition { get; set; } = false;
+		}
+
 		public static class WebView
 		{
 #if __ANDROID__
@@ -564,6 +601,18 @@ namespace Uno.UI
 			/// </remarks>
 			/// <returns>True if this feature is on, False otherwise</returns>
 			public static bool EnableBitmapIconTint { get; set; } = false;
+#endif
+		}
+
+		public static class Cursors
+		{
+#if UNO_REFERENCE_API
+			/// <summary>
+			/// Gets or sets a value indicating whether "interactive" controls like
+			/// Buttons and ToggleSwitches use the pointer cursor in WebAssembly
+			/// to emulate a "web-like" feel. Default is <see langword="true"/>.
+			/// </summary>
+			public static bool UseHandForInteraction { get; set; } = true;
 #endif
 		}
 	}

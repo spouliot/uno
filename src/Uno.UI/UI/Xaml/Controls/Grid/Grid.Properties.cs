@@ -6,6 +6,7 @@ using System.Text;
 using Uno.UI;
 using Uno.UI.Extensions;
 using Uno.UI.Xaml;
+using Windows.UI.Xaml.Media;
 
 #if XAMARIN_ANDROID
 using View = Android.Views.View;
@@ -28,22 +29,123 @@ namespace Windows.UI.Xaml.Controls
 {
 	partial class Grid
 	{
+
+		#region BackgroundSizing DepedencyProperty
+		[GeneratedDependencyProperty(DefaultValue = default(BackgroundSizing), ChangedCallback = true)]
+		public static DependencyProperty BackgroundSizingProperty { get; } = CreateBackgroundSizingProperty();
+
+		public BackgroundSizing BackgroundSizing
+		{
+			get => GetBackgroundSizingValue();
+			set => SetBackgroundSizingValue(value);
+		}
+
+		private void OnBackgroundSizingChanged(DependencyPropertyChangedEventArgs e)
+		{
+			base.OnBackgroundSizingChangedInnerPanel(e);
+		}
+		#endregion
+
+		#region BorderBrush DependencyProperty
+
+		public Brush BorderBrush
+		{
+			get => GetBorderBrushValue();
+			set => SetBorderBrushValue(value);
+		}
+
+		private static Brush GetBorderBrushDefaultValue() => SolidColorBrushHelper.Transparent;
+
+		[GeneratedDependencyProperty(ChangedCallbackName = nameof(OnBorderBrushPropertyChanged), Options = FrameworkPropertyMetadataOptions.ValueInheritsDataContext)]
+		public static DependencyProperty BorderBrushProperty { get; } = CreateBorderBrushProperty();
+
+		private void OnBorderBrushPropertyChanged(Brush oldValue, Brush newValue)
+		{
+			BorderBrushInternal = newValue;
+			OnBorderBrushChanged(oldValue, newValue);
+		}
+
+		#endregion
+
+		#region BorderThickness DependencyProperty
+
+		public Thickness BorderThickness
+		{
+			get => GetBorderThicknessValue();
+			set => SetBorderThicknessValue(value);
+		}
+
+		private static Thickness GetBorderThicknessDefaultValue() => Thickness.Empty;
+
+		[GeneratedDependencyProperty(ChangedCallbackName = nameof(OnBorderThicknessPropertyChanged))]
+		public static DependencyProperty BorderThicknessProperty { get; } = CreateBorderThicknessProperty();
+
+		private void OnBorderThicknessPropertyChanged(Thickness oldValue, Thickness newValue)
+		{
+			BorderThicknessInternal = newValue;
+			OnBorderThicknessChanged(oldValue, newValue);
+		}
+
+		#endregion
+
+		#region Padding DependencyProperty
+
+		public Thickness Padding
+		{
+			get => GetPaddingValue();
+			set => SetPaddingValue(value);
+		}
+
+		private static Thickness GetPaddingDefaultValue() => Thickness.Empty;
+
+		[GeneratedDependencyProperty(ChangedCallbackName = nameof(OnPaddingPropertyChanged))]
+		public static DependencyProperty PaddingProperty { get; } = CreatePaddingProperty();
+
+		private void OnPaddingPropertyChanged(Thickness oldValue, Thickness newValue)
+		{
+			PaddingInternal = newValue;
+			OnPaddingChanged(oldValue, newValue);
+		}
+
+		#endregion
+
+		#region CornerRadius DependencyProperty
+
+		public CornerRadius CornerRadius
+		{
+			get => GetCornerRadiusValue();
+			set => SetCornerRadiusValue(value);
+		}
+
+		private static CornerRadius GetCornerRadiusDefaultValue() => CornerRadius.None;
+
+		[GeneratedDependencyProperty(ChangedCallbackName = nameof(OnCornerRadiusPropertyChanged))]
+		public static DependencyProperty CornerRadiusProperty { get; } = CreateCornerRadiusProperty();
+
+		private void OnCornerRadiusPropertyChanged(CornerRadius oldValue, CornerRadius newValue)
+		{
+			CornerRadiusInternal = newValue;
+			OnCornerRadiusChanged(oldValue, newValue);
+		}
+
+		#endregion
+
 		#region Row Property
 		[GeneratedDependencyProperty(DefaultValue = 0, AttachedBackingFieldOwner = typeof(UIElement), Attached = true, ChangedCallbackName = nameof(OnGenericPropertyChanged))]
 		public static DependencyProperty RowProperty { get ; } = CreateRowProperty();
 
-		public static int GetRow(View view) => GetRowValue(view as UIElement);
+		public static int GetRow(View view) => GetRowValue(view);
 
-		public static void SetRow(View view, int row) => SetRowValue(view as UIElement, row);
+		public static void SetRow(View view, int row) => SetRowValue(view, row);
 		#endregion
 
 		#region Column Property
 		[GeneratedDependencyProperty(DefaultValue = 0, AttachedBackingFieldOwner = typeof(UIElement), Attached = true, ChangedCallbackName = nameof(OnGenericPropertyChanged))]
 		public static DependencyProperty ColumnProperty { get ; } = CreateColumnProperty();
 
-		public static int GetColumn(View view) => GetColumnValue(view as UIElement);
+		public static int GetColumn(View view) => GetColumnValue(view);
 
-		public static void SetColumn(View view, int column) => SetColumnValue(view as UIElement, column);
+		public static void SetColumn(View view, int column) => SetColumnValue(view, column);
 		#endregion
 
 		#region RowSpan Property

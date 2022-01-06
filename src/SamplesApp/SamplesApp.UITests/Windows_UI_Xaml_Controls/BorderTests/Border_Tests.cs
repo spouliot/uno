@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using SamplesApp.UITests.TestFramework;
+using SamplesApp.UITests.Windows_UI_Xaml_Controls.FrameworkElementTests;
 using Uno.UITest.Helpers;
 using Uno.UITest.Helpers.Queries;
 
@@ -33,6 +35,29 @@ namespace SamplesApp.UITests.Windows_UI_Xaml_Controls.BorderTests
 
 		[Test]
 		[AutoRetry]
+		public void Check_CornerRadius_Border_Basic()
+		{
+			const string white = "#FFFFFF";
+
+			// Verify that border is drawn with CornerRadius
+			Run("Uno.UI.Samples.UITests.BorderTestsControl.Border_CornerRadius", skipInitialScreenshot: true);
+
+			var sample = _app.GetPhysicalRect("Sample1");
+			var eighth = sample.Width / 8;
+
+			using var result = TakeScreenshot("sample");
+
+			ImageAssert.HasPixels(
+				result,
+				ExpectedPixels.At(sample.X + eighth, sample.Y + eighth).Named("top left corner").Pixel(white),
+				ExpectedPixels.At(sample.Right - eighth, sample.Y + eighth).Named("top right corner").Pixel(white),
+				ExpectedPixels.At(sample.Right - eighth, sample.Bottom - eighth).Named("bottom right corner").Pixel(white),
+				ExpectedPixels.At(sample.X + eighth, sample.Bottom - eighth).Named("bottom left corner").Pixel(white)
+			);
+		}
+
+		[Test]
+		[AutoRetry]
 		public void Check_CornerRadius_Border()
 		{
 			// Verify that border is drawn with the same thickness with/without CornerRadius
@@ -57,19 +82,31 @@ namespace SamplesApp.UITests.Windows_UI_Xaml_Controls.BorderTests
 		[AutoRetry]
 		public void Border_CornerRadius_BorderThickness()
 		{
-			const string red = "#FF0000";
-			const string blue = "#0000FF";
+			// White Background color underneath
+			const string white = "#FFFFFF";
+
+			//Colors with 50% Opacity
+			const string red50 = "#80FF0000";
+			const string blue50 = "#800000FF";
+
+			//Same colors but with the addition of a White background color underneath
+			const string lightPink = "#FF7F7F";
+			const string lightBlue = "#7F7FFF";
 
 			var expectedColors = new[]
 			{
-				new ExpectedColor { Thicknesses = new [] { 10, 10, 10, 10 }, Colors = new [] { red, red, red, red } },
-				new ExpectedColor { Thicknesses = new [] { 10, 0, 10, 10 }, Colors = new [] { red, blue, red, red } },
-				new ExpectedColor { Thicknesses = new [] { 10, 0, 0, 10 }, Colors = new [] { red, blue, blue, red } },
-				new ExpectedColor { Thicknesses = new [] { 10, 0, 0, 0 }, Colors = new [] { red, blue, blue, blue } },
-				new ExpectedColor { Thicknesses = new [] { 0, 0, 0, 0 }, Colors = new [] { blue, blue, blue, blue } },
+				new ExpectedColor { Thicknesses = new [] { 10, 10, 10, 10 }, Colors = new [] { lightPink, lightPink, lightPink, lightPink } },
+				new ExpectedColor { Thicknesses = new [] { 10, 0, 10, 10 }, Colors = new [] { lightPink, lightBlue, lightPink, lightPink } },
+				new ExpectedColor { Thicknesses = new [] { 10, 0, 0, 10 }, Colors = new [] { lightPink, lightBlue, lightBlue, lightPink } },
+				new ExpectedColor { Thicknesses = new [] { 10, 0, 0, 0 }, Colors = new [] { lightPink, lightBlue, lightBlue, lightBlue } },
+				new ExpectedColor { Thicknesses = new [] { 0, 0, 0, 0 }, Colors = new [] { lightBlue, lightBlue, lightBlue, lightBlue } },
 			};
 
 			Run("UITests.Windows_UI_Xaml_Controls.BorderTests.Border_CornerRadius_BorderThickness");
+
+			_app.WaitForElement("MyBackgroundUnderneath");
+
+			SetBorderProperty("MyBackgroundUnderneath", "Background", white);
 
 			_app.WaitForElement("MyBorder");
 
@@ -80,6 +117,8 @@ namespace SamplesApp.UITests.Windows_UI_Xaml_Controls.BorderTests
 			var centerTarget = _app.GetPhysicalRect("CenterTarget");
 
 			SetBorderProperty("MyBorder", "CornerRadius", "10");
+			SetBorderProperty("MyBorder", "BorderBrush", red50);
+			SetBorderProperty("MyBorder", "Background", blue50);
 
 			foreach (var expected in expectedColors)
 			{
@@ -108,7 +147,7 @@ namespace SamplesApp.UITests.Windows_UI_Xaml_Controls.BorderTests
 					ExpectedPixels
 						.At($"center-{expected}", centerTarget.CenterX, centerTarget.CenterY)
 						.WithPixelTolerance(1, 1)
-						.Pixel(blue)
+						.Pixel(lightBlue)
 				);
 			}
 		}
@@ -149,6 +188,37 @@ namespace SamplesApp.UITests.Windows_UI_Xaml_Controls.BorderTests
 					.WithPixelTolerance(1, 1)
 					.Pixel(red)
 			);
+		}
+
+		[Test]
+		[AutoRetry]
+		[ActivePlatforms(Platform.Android, Platform.Browser)] // iOS not working currently. https://github.com/unoplatform/uno/issues/6749
+		public void Border_LinearGradient()
+		{
+			Run("UITests.Windows_UI_Xaml_Controls.BorderTests.Border_LinearGradientBrush");
+
+			var textBoxRect = _app.GetPhysicalRect("MyTextBox");
+
+			using var screenshot = TakeScreenshot("Screenshot");
+
+			// The color near the end is blueish.
+			ImageAssert.HasColorAt(screenshot, (float)(textBoxRect.CenterX + 0.45 * textBoxRect.Width), textBoxRect.Y, Color.FromArgb(31, 0, 224), tolerance: 20);
+
+			// The color near the start is reddish.
+			ImageAssert.HasColorAt(screenshot, (float)(textBoxRect.CenterX - 0.45 * textBoxRect.Width), textBoxRect.Y, Color.Red, tolerance: 20);
+		}
+
+		[Test]
+		[AutoRetry]
+		public void Border_CornerRadius_GradientBrush()
+		{
+			Run("UITests.Windows_UI_Xaml_Controls.BorderTests.Border_CornerRadius_Gradient");
+
+			var textBoxRect = _app.GetPhysicalRect("RedBorder");
+
+			using var screenshot = TakeScreenshot("Screenshot");
+
+			ImageAssert.HasColorAt(screenshot, textBoxRect.CenterX, textBoxRect.CenterY, Color.FromArgb(0, 255, 0));
 		}
 
 		private void SetBorderProperty(string borderName, string propertyName, string value)

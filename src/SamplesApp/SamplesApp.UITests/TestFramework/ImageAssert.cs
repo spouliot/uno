@@ -88,7 +88,7 @@ namespace SamplesApp.UITests.TestFramework
 		private static void AreEqualImpl(
 			ScreenshotInfo expected,
 			Rectangle expectedRect,
-			ScreenshotInfo actual,
+			ScreenshotInfo? actual,
 			Bitmap actualBitmap,
 			Rectangle actualRect,
 			double expectedToActualScale,
@@ -115,7 +115,7 @@ namespace SamplesApp.UITests.TestFramework
 		private static (bool areEqual, string context) EqualityCheck(
 			ScreenshotInfo expected,
 			Rectangle expectedRect,
-			ScreenshotInfo actual,
+			ScreenshotInfo? actual,
 			Bitmap actualBitmap,
 			Rectangle actualRect,
 			double expectedToActualScale,
@@ -222,6 +222,27 @@ namespace SamplesApp.UITests.TestFramework
 		public static void HasColorAt(ScreenshotInfo screenshot, float x, float y, Color expectedColor, byte tolerance = 0, [CallerLineNumber] int line = 0)
 			=> HasColorAtImpl(screenshot, (int)x, (int)y, expectedColor, tolerance, line);
 
+		/// <summary>
+		/// Asserts that a given screenshot has a color anywhere at a given rectangle.
+		/// </summary>
+		public static void HasColorInRectangle(ScreenshotInfo screenshot, Rectangle rect, Color expectedColor, byte tolerance = 0, [CallerLineNumber] int line = 0)
+		{
+			var bitmap = screenshot.GetBitmap();
+			for (var x = rect.Left; x < rect.Right; x++)
+			{
+				for (var y = rect.Top; y < rect.Bottom; y++)
+				{
+					var pixel = bitmap.GetPixel(x, y);
+					if (AreSameColor(expectedColor, pixel, tolerance, out _))
+					{
+						return;
+					}
+				}
+			}
+
+			Assert.Fail($"Expected '{ToArgbCode(expectedColor)}' in rectangle '{rect}'.");
+		}
+
 		private static void HasColorAtImpl(ScreenshotInfo screenshot, int x, int y, Color expectedColor, byte tolerance, int line)
 		{
 			var bitmap = screenshot.GetBitmap();
@@ -244,7 +265,7 @@ namespace SamplesApp.UITests.TestFramework
 				));
 			}
 
-			string WithContext(string message = null, Action<StringBuilder> builder = null)
+			string WithContext(string? message = null, Action<StringBuilder>? builder = null)
 			{
 				return new StringBuilder()
 					.AppendLine($"ImageAssert.HasColorAt @ line {line}")
@@ -284,7 +305,7 @@ namespace SamplesApp.UITests.TestFramework
 				));
 			}
 
-			string WithContext(string message = null, Action<StringBuilder> builder = null)
+			string WithContext(string? message = null, Action<StringBuilder>? builder = null)
 			{
 				return new StringBuilder()
 					.AppendLine($"ImageAssert.DoesNotHaveColorAt @ line {line}")
@@ -324,7 +345,7 @@ namespace SamplesApp.UITests.TestFramework
 		#region Validation core (ExpectedPixels)
 		private static bool Validate(ExpectedPixels expectation, Bitmap actualBitmap, double expectedToActualScale, StringBuilder report)
 		{
-			report?.AppendLine($"{expectation.Name}:");
+			report.AppendLine($"{expectation.Name}:");
 
 			bool isSuccess;
 			switch (expectation.Tolerance.OffsetKind)
@@ -393,7 +414,7 @@ namespace SamplesApp.UITests.TestFramework
 			double expectedToActualScale,
 			Point pixel,
 			(int x, int y) offset,
-			StringBuilder report = null)
+			StringBuilder report)
 		{
 			var expectedColor = expectation.Values[pixel.Y, pixel.X];
 			if (expectedColor.IsEmpty)
