@@ -523,10 +523,11 @@ namespace SamplesApp.UITests.Windows_UI_Xaml_Controls.TextBlockTests
 			const float precision = 20f; // On iOS he result is 148 and MacOS it's 146
 			textBlockHeight.Should().BeApproximately(expectedHeight, precision);
 			textBoxHeight.Should().BeApproximately(expectedHeight, precision);
+		}
 
 		[Test]
 		[AutoRetry]
-    [ActivePlatforms(Platform.Browser)]
+		[ActivePlatforms(Platform.Browser)]
 		public void When_Text_Selection_Is_Enabled()
 		{
 			Run("UITests.Windows_UI_Xaml_Controls.TextBlockControl.TextBlock_IsTextSelectionEnabled");
