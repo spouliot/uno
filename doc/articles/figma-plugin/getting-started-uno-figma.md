@@ -12,6 +12,9 @@ https://www.youtube.com/watch?v=5G73e21yN_w
 6. Adding components to an existing page: Open the _Assets_ page (at the top/left of the screen) and open the `Components` section. Pick a desired component and drag it inside an existing page on the design surface.
 ### Tips for designers
 * Time should be taken to ensure the _Resizing_ section is set to appropriate values for each component. This is important to ensure proper layout of the result.
+
+Next: [build a simple login page with the Uno Figma plugin](designers/simple-login-page.md)
+
 ## Developer's Side
 1. The  [Uno Platform Figma Plugin](https://www.figma.com/community/plugin/1045528009520465828/Uno-Platform) must be installed for the current user.
 2. Open the document saved by the designer. Since a plugin will be used, **Edition privileges are required** by figma to run any plugin on a document.
