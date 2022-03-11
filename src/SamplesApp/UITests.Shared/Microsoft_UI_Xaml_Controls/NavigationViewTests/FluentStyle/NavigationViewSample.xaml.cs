@@ -20,7 +20,7 @@ namespace SamplesApp.Samples.Microsoft_UI_Xaml_Controls.NavigationViewTests.Flue
 	/// An empty page that can be used on its own or navigated to within a Frame.
 	/// </summary>
 	[SampleControlInfo("NavigationView", "FluentStyle_NavigationViewSample")]
-	public sealed partial class FluentStyle_NavigationViewSample
+	public sealed partial class FluentStyle_NavigationViewSample : Windows.UI.Xaml.Controls.UserControl
 	{
 		public FluentStyle_NavigationViewSample()
 		{

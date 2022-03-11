@@ -304,6 +304,7 @@
 	<UnoSourceGeneratorAdditionalProperty Include="LegacyTypesProperty" />
 	<UnoSourceGeneratorAdditionalProperty Include="UnoUIUseRoslynSourceGenerators" />
 	<UnoSourceGeneratorAdditionalProperty Include="ProjectTypeGuidsProperty" />
+	<UnoSourceGeneratorAdditionalProperty Include="TSBindingAssemblySourceProperty" />
 	<UnoSourceGeneratorAdditionalProperty Include="DefineConstantsProperty" />
 	<UnoSourceGeneratorAdditionalProperty Include="IsUiAutomationMappingEnabled" />
   </ItemGroup>
@@ -348,6 +349,12 @@
 		<Output
 				TaskParameter="Value"
 				PropertyName="DefineConstantsProperty" />
+	</CreateProperty>
+
+	<CreateProperty Value="$(TSBindingAssemblySource.Replace(';',','))">
+		<Output
+				TaskParameter="Value"
+				PropertyName="TSBindingAssemblySourceProperty" />
 	</CreateProperty>
 
   </Target>

@@ -26,9 +26,12 @@
 		<PlatformItemsBasePath>.\</PlatformItemsBasePath>
 	</PropertyGroup>
 
+	<PropertyGroup>
+		<TSBindingAssemblySource>$(TSBindingAssemblySource);Uno</TSBindingAssemblySource>
+		<TSBindingAssemblySource>$(TSBindingAssemblySource);Uno.UI</TSBindingAssemblySource>
+	</PropertyGroup>
+
 	<ItemGroup>
-		<TSBindingAssemblySource Include="Uno" />
-		<TSBindingAssemblySource Include="Uno.UI" />
 		<ConfigFiles Include="tsconfig.json" />
 	</ItemGroup>
 

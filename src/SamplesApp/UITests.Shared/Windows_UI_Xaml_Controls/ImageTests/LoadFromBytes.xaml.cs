@@ -11,7 +11,7 @@ using Uno.Extensions;
 namespace Uno.UI.Samples.UITests.ImageTestsControl
 {
 	[SampleControlInfo("Image", "LoadFromBytes")]
-	public sealed partial class LoadFromBytes
+	public sealed partial class LoadFromBytes : Windows.UI.Xaml.Controls.UserControl
 	{
 		public LoadFromBytes()
 		{

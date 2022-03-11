@@ -15,7 +15,7 @@ namespace MUXControlsTestApp
 {
 
 	[SampleControlInfo("DropDownButton", "MUX Page")]
-	public sealed partial class DropDownButtonPage
+	public sealed partial class DropDownButtonPage : Windows.UI.Xaml.Controls.UserControl
 	{
 		private int _clickCount = 0;
 		private int _flyoutOpenedCount = 0;

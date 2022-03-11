@@ -19,7 +19,7 @@ using Windows.UI.Xaml.Shapes;
 namespace MUXControlsTestApp
 {
 	[SampleControlInfo("PersonPicture", "MUX Page")]
-	public sealed partial class PersonPicturePage
+	public sealed partial class PersonPicturePage : Windows.UI.Xaml.Controls.UserControl
     {
         private Uri imageUri = new Uri("ms-appx:///Assets/ingredient2.png");
         private bool primaryEllipseLoaded = false;

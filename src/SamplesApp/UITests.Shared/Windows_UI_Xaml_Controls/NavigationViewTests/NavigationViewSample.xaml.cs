@@ -20,7 +20,7 @@ namespace SamplesApp.Samples.NavigationViewSample
 	/// An empty page that can be used on its own or navigated to within a Frame.
 	/// </summary>
 	[SampleControlInfo("NavigationView", "NavigationViewSample")]
-	public sealed partial class NavigationViewSample
+	public sealed partial class NavigationViewSample : Windows.UI.Xaml.Controls.UserControl
 	{
 		public NavigationViewSample()
 		{
