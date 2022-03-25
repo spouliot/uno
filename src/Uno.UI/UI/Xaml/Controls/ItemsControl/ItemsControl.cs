@@ -1352,7 +1352,7 @@ namespace Windows.UI.Xaml.Controls
 				}
 
 				var container = item as DependencyObject;
-				if (container is UIElement { IsLoaded: false })
+				if (container is FrameworkElement { IsLoaded: false })
 				{
 					return null;
 				}
@@ -1362,7 +1362,7 @@ namespace Windows.UI.Xaml.Controls
 
 			var index = IndexFromItem(item);
 			var containerFromIndex = index == -1 ? null : MaterializedContainers.FirstOrDefault(materializedContainer => Equals(IndexFromContainer(materializedContainer), index));
-			if (containerFromIndex is UIElement { IsLoaded: false })
+			if (containerFromIndex is FrameworkElement { IsLoaded: false })
 			{
 				return null;
 			}
@@ -1430,7 +1430,7 @@ namespace Windows.UI.Xaml.Controls
 			if (IsItemItsOwnContainer(item))
 			{
 				var itemContainer = item as DependencyObject;
-				if (itemContainer is UIElement { IsLoaded: false })
+				if (itemContainer is FrameworkElement { IsLoaded: false })
 				{
 					return null;
 				}
@@ -1446,7 +1446,7 @@ namespace Windows.UI.Xaml.Controls
 			}
 
 			var containerFromIndex = ContainerFromIndexInner(adjustedIndex);
-			if (containerFromIndex is UIElement { IsLoaded: false })
+			if (containerFromIndex is FrameworkElement { IsLoaded: false })
 			{
 				return null;
 			}
