@@ -83,6 +83,7 @@ namespace Windows.UI.Xaml
 						oldRoot.SizeChanged -= RootSizeChanged;
 					}
 				}
+				
 				if (value != null)
 				{
 					value.IsWindowRoot = true;
@@ -92,9 +93,10 @@ namespace Windows.UI.Xaml
 
 				if (value is FrameworkElement newRoot)
 				{
-					newRoot.SizeChanged += RootSizeChanged;
+					newRoot.SizeChanged += RootSizeChanged;					
 				}
-				XamlRoot.Current.NotifyChanged();
+
+				(value?.XamlRoot ?? oldContent?.XamlRoot)?.NotifyChanged();
 			}
 		}
 
@@ -213,10 +215,7 @@ namespace Windows.UI.Xaml
 			}
 		}
 
-		private void RootSizeChanged(object sender, SizeChangedEventArgs args)
-		{
-			XamlRoot.Current.NotifyChanged();
-		}
+		private void RootSizeChanged(object sender, SizeChangedEventArgs args) => _rootVisual.XamlRoot.NotifyChanged();
 
 		private void RaiseSizeChanged(Windows.UI.Core.WindowSizeChangedEventArgs windowSizeChangedEventArgs)
 		{

@@ -39,7 +39,6 @@ namespace Windows.UI.Xaml
 	public partial class UIElement : DependencyObject, IXUidProvider, IUIElement
 	{
 		private readonly SerialDisposable _clipSubscription = new SerialDisposable();
-		private XamlRoot _xamlRoot = null;
 		private string _uid;
 		private WeakReference<VisualTree> _visualTreeWeakReference;
 
@@ -131,8 +130,31 @@ namespace Windows.UI.Xaml
 
 		public XamlRoot XamlRoot
 		{
-			get => _xamlRoot ?? XamlRoot.Current;
-			set => _xamlRoot = value;
+			get
+			{
+				var visualTree = VisualTree.GetForElement(this);
+				if (visualTree is not null)
+				{
+					var xamlRoot = visualTree.GetOrCreateXamlRoot();
+					return xamlRoot;
+				}
+
+				return null;
+			}
+			set
+			{
+				if (XamlRoot == value)
+				{
+					return;
+				}
+
+				if (XamlRoot is not null)
+				{
+					throw new InvalidOperationException("Cannot change XamlRoot for existing element");
+				}
+
+				// TODO:MZ: It should be possible to set XamlRoot when still null.
+			}
 		}
 
 		#region VirtualizationInformation
