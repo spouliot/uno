@@ -124,11 +124,12 @@ namespace Uno.UI.Skia.Platform
 
 			WinUI.Application.Start(CreateApp, args);
 
-			WinUI.Window.InvalidateRender += () =>
-			{
-				InvalidateOverlays();
-				InvalidateVisual();
-			};
+			//TODO:MZ:
+			//WinUI.Window.InvalidateRender += () =>
+			//{
+			//	InvalidateOverlays();
+			//	InvalidateVisual();
+			//};
 
 			WpfApplication.Current.Activated += Current_Activated;
 			WpfApplication.Current.Deactivated += Current_Deactivated;
